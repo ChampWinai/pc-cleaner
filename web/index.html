@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>PC Cleaner</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <div id="toast-stack" class="toast-stack"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">✦</span>
+      <span class="brand-name">PC Cleaner</span>
+    </div>
+    <div class="topbar-status" id="statusText">กำลังสแกน...</div>
+  </header>
+
+  <nav class="tabbar">
+    <button class="tab-btn active" data-tab="clean">🧹 ล้างไฟล์ขยะ</button>
+    <button class="tab-btn" data-tab="uninstall">📦 ถอนการติดตั้ง</button>
+    <button class="tab-btn" data-tab="startup">🚀 โปรแกรมเริ่มต้น</button>
+    <button class="tab-btn" data-tab="gamemode">🎮 Game Mode</button>
+    <button class="tab-btn" data-tab="privacy">🔒 ความเป็นส่วนตัว</button>
+    <button class="tab-btn" data-tab="drivers">🔧 ฮาร์ดแวร์ &amp; ไดรเวอร์</button>
+  </nav>
+
+  <main class="layout tab-panel" id="tab-clean">
+    <!-- Summary + Treemap -->
+    <section class="glass glow-hover panel-summary">
+      <div class="summary-left">
+        <div class="summary-label">พื้นที่ที่จะปลดล็อกได้</div>
+        <div class="summary-value mono"><span id="totalValue">0</span><span class="summary-unit" id="totalUnit">B</span></div>
+        <div class="summary-sub" id="itemCountText">พบ 0 รายการ</div>
+      </div>
+      <div class="summary-right">
+        <svg viewBox="0 0 120 120" class="ring">
+          <circle cx="60" cy="60" r="52" class="ring-track" />
+          <circle cx="60" cy="60" r="52" class="ring-fill" id="ringFill" />
+        </svg>
+        <div class="ring-label mono" id="ringLabel">0%</div>
+      </div>
+    </section>
+
+    <section class="glass glow-hover panel-treemap">
+      <div class="treemap-header">
+        <div class="panel-title">แผนภูมิพื้นที่ (Treemap) — คลิกเพื่อเจาะลึก</div>
+        <div id="breadcrumb" class="breadcrumb"></div>
+      </div>
+      <div id="treemap" class="treemap"></div>
+      <div class="legend">
+        <span class="legend-item"><i class="dot dot-safe"></i>ปลอดภัย</span>
+        <span class="legend-item"><i class="dot dot-low"></i>ควรทราบ</span>
+        <span class="legend-item"><i class="dot dot-medium"></i>ควรตรวจสอบ</span>
+        <span class="legend-item"><i class="dot" style="background:var(--accent)"></i>โฟลเดอร์</span>
+        <span class="legend-item"><i class="dot" style="background:var(--file-color)"></i>ไฟล์</span>
+      </div>
+    </section>
+
+    <!-- Tool cards -->
+    <section class="cards-row">
+      <div class="glass glow-hover card">
+        <div class="card-icon">🧠</div>
+        <div class="card-body">
+          <div class="card-title">หน่วยความจำ (RAM)</div>
+          <div class="card-value mono" id="ramText">กำลังตรวจสอบ...</div>
+          <div class="meter"><div class="meter-fill" id="ramBar"></div></div>
+        </div>
+        <button class="btn btn-accent" id="btnRam">ล้าง RAM</button>
+      </div>
+
+      <div class="glass glow-hover card" style="--glow-rgb: var(--danger-rgb);">
+        <div class="card-icon">🧺</div>
+        <div class="card-body">
+          <div class="card-title">ถังขยะ (Recycle Bin)</div>
+          <div class="card-value muted">ลบไฟล์ที่ทิ้งไปแล้วอย่างถาวร</div>
+        </div>
+        <button class="btn btn-danger" id="btnBin">ล้างถังขยะ</button>
+      </div>
+
+      <div class="glass glow-hover card" style="--glow-rgb: var(--purple-rgb);">
+        <div class="card-icon">🗄</div>
+        <div class="card-body">
+          <div class="card-title">Safety Vault</div>
+          <div class="card-value mono" id="vaultText">0 รายการ</div>
+        </div>
+        <button class="btn btn-privacy" id="btnVault">เปิดดู</button>
+      </div>
+
+      <div class="glass glow-hover card">
+        <div class="card-icon">🐳</div>
+        <div class="card-body">
+          <div class="card-title">Docker Cache</div>
+          <div class="card-value muted" id="dockerText">กำลังตรวจสอบ...</div>
+        </div>
+        <button class="btn btn-accent" id="btnDocker" disabled>ล้าง Cache</button>
+      </div>
+    </section>
+
+    <div class="toggle-row">
+      <label class="switch">
+        <input type="checkbox" id="deepToggle" />
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">โหมดล้างเชิงลึก (Windows Update Cache, Delivery Optimization, Firefox Cache ฯลฯ)</span>
+    </div>
+
+    <!-- Item list -->
+    <section class="glass glow-hover panel-list">
+      <div class="panel-title">รายการไฟล์ขยะที่พบ</div>
+      <div id="itemList" class="item-list"></div>
+    </section>
+  </main>
+
+  <!-- App Uninstaller tab -->
+  <main class="layout tab-panel hidden" id="tab-uninstall">
+    <section class="glass glow-hover panel-list panel-tall">
+      <div class="panel-title">📦 โปรแกรมที่ติดตั้งไว้ (เรียงตามขนาด)</div>
+      <div class="panel-sub">คลิก "ถอนการติดตั้ง" เพื่อเปิดตัวถอนการติดตั้งของโปรแกรมนั้นๆ โดยตรง (เหมือนใช้ Apps & Features ของ Windows)</div>
+      <div id="appList" class="item-list"></div>
+    </section>
+  </main>
+
+  <!-- Startup Manager tab -->
+  <main class="layout tab-panel hidden" id="tab-startup">
+    <section class="glass glow-hover panel-list panel-tall">
+      <div class="panel-title">🚀 โปรแกรมที่เปิดพร้อม Windows</div>
+      <div class="panel-sub">ปิดโปรแกรมที่ไม่จำเป็นเพื่อบูตเร็วขึ้น หรือหน่วงเวลาเปิด 2 นาทีแทนการปิดถาวร</div>
+      <div id="startupList" class="item-list"></div>
+    </section>
+  </main>
+
+  <!-- Game Mode tab -->
+  <main class="layout tab-panel hidden" id="tab-gamemode">
+    <section class="glass glow-hover panel-summary">
+      <div class="summary-left">
+        <div class="summary-label">สถานะ Game Mode</div>
+        <div class="summary-value" id="gameModeStatus" style="font-size:22px;">ปิดอยู่</div>
+        <div class="summary-sub">เลือกโปรแกรมพื้นหลังที่จะ "แช่แข็ง" ชั่วคราวตอนเล่นเกม/เรนเดอร์งาน แล้วกดคืนค่าเมื่อเลิกใช้</div>
+      </div>
+      <button class="btn btn-accent" id="btnGameModeToggle" style="width:140px;">🎮 เปิด Game Mode</button>
+    </section>
+    <section class="glass glow-hover panel-list panel-tall">
+      <div class="panel-title">โปรแกรมที่กำลังทำงาน (เรียงตามหน่วยความจำ)</div>
+      <div class="panel-sub">ติ๊กเลือกโปรแกรมที่ต้องการแช่แข็ง — โปรแกรมระบบสำคัญถูกซ่อนไว้เพื่อความปลอดภัย</div>
+      <div id="processList" class="item-list"></div>
+    </section>
+  </main>
+
+  <!-- Privacy tab -->
+  <main class="layout tab-panel hidden" id="tab-privacy">
+    <section class="glass glow-hover panel-summary" style="--glow-rgb: var(--purple-rgb);">
+      <div class="summary-left">
+        <div class="summary-label">🔒 ตัวสแกนหาข้อมูลอ่อนไหว</div>
+        <div class="summary-sub" id="privacyFolderText">ยังไม่ได้เลือกโฟลเดอร์</div>
+        <div class="summary-sub" style="margin-top:6px;">สแกนหาเลขบัตรประชาชน, เลขบัตรเครดิต, และรหัสผ่านที่อยู่ในไฟล์ข้อความ (heuristic ไม่ใช่ AI จริง — อาจมีทั้ง false positive/negative)</div>
+      </div>
+      <button class="btn btn-privacy" id="btnPickFolder" style="width:150px;">📁 เลือกโฟลเดอร์</button>
+    </section>
+    <section class="glass glow-hover panel-list panel-tall" style="--glow-rgb: var(--purple-rgb);">
+      <div class="panel-title">ผลการสแกน</div>
+      <div id="sensitiveList" class="item-list"></div>
+    </section>
+  </main>
+
+  <!-- Hardware & Driver tab -->
+  <main class="layout tab-panel hidden" id="tab-drivers">
+    <section class="glass glow-hover panel-summary">
+      <div class="summary-left">
+        <div class="summary-label">🔧 อัปเดตไดรเวอร์</div>
+        <div class="summary-sub" id="driverUpdateText">ยังไม่ได้ตรวจสอบ</div>
+      </div>
+      <button class="btn btn-accent" id="btnCheckDrivers" style="width:180px;">ตรวจสอบอัปเดต</button>
+    </section>
+    <section class="glass glow-hover panel-list" id="driverUpdatesPanel" style="display:none;">
+      <div class="panel-title">อัปเดตที่พร้อมติดตั้ง</div>
+      <div id="driverUpdateList" class="item-list"></div>
+      <button class="btn btn-accent" id="btnOpenWU" style="margin-top:10px;width:220px;">เปิด Windows Update เพื่อติดตั้ง</button>
+    </section>
+    <section class="glass glow-hover panel-list panel-tall">
+      <div class="panel-title">ไดรเวอร์ที่ติดตั้งอยู่ (เรียงจากเก่าสุด)</div>
+      <div class="panel-sub">ไดรเวอร์เก่ามากไม่ได้แปลว่ามีปัญหาเสมอไป — ฮาร์ดแวร์บางตัวไม่จำเป็นต้องอัปเดตบ่อย</div>
+      <div id="driverList" class="item-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer" id="footerClean">
+    <div class="footer-left">
+      <button class="btn btn-ghost" id="btnSelectAll">เลือกทั้งหมด</button>
+      <button class="btn btn-ghost" id="btnSelectNone">ยกเลิก</button>
+      <button class="btn btn-ghost" id="btnRescan">⟳ สแกนใหม่</button>
+    </div>
+    <div class="footer-right">
+      <button class="btn btn-danger" id="btnCleanSelected" disabled>🗑 ลบรายการที่เลือก</button>
+      <button class="btn btn-accent" id="btnCleanAll" disabled>🚀 ล้างทั้งหมด</button>
+    </div>
+  </footer>
+
+  <!-- Vault modal -->
+  <div id="vaultModal" class="modal-backdrop hidden">
+    <div class="glass modal" style="border-color: rgba(var(--purple-rgb), 0.3);">
+      <div class="modal-header">
+        <div class="panel-title">🗄 Safety Vault</div>
+        <button class="btn-close" id="btnCloseVault">✕</button>
+      </div>
+      <div class="modal-sub">ไฟล์เหล่านี้จะถูกลบถาวรอัตโนมัติหลัง 14 วัน — กู้คืนได้ตลอดก่อนหน้านั้น</div>
+      <div id="vaultList" class="vault-list"></div>
+    </div>
+  </div>
+
+  <!-- Confirm modal -->
+  <div id="confirmModal" class="modal-backdrop hidden">
+    <div class="glass modal modal-confirm">
+      <div class="panel-title" id="confirmTitle">ยืนยันการลบ</div>
+      <div class="modal-sub" id="confirmBody"></div>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" id="btnConfirmCancel">ยกเลิก</button>
+        <button class="btn btn-danger" id="btnConfirmOk">ยืนยัน</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
