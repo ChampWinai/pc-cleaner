@@ -785,6 +785,351 @@ function init() {
   refreshVaultCount();
   initDocker();
   state.ramTimer = setInterval(refreshRam, 5000);
+
+  initRemote();
+}
+
+// ---------------------------------------------------------------------
+// Remote Assistance & Diagnostic Tools
+// ---------------------------------------------------------------------
+const remoteState = {
+  mode: null,          // "host" | "controller" | null
+  hostTimer: null,
+  ctrlStatusTimer: null,
+  ctrlFrameTimer: null,
+  ctrlTelemetryTimer: null,
+  ctrlActionTimer: null,
+  ctrlActive: false,
+  lastMoveSent: 0,
+  actionsLoaded: false,
+};
+
+function setRemoteMode(mode) {
+  remoteState.mode = mode;
+  $("cardGetHelp").classList.toggle("selected", mode === "host");
+  $("cardGiveHelp").classList.toggle("selected", mode === "controller");
+  $("remoteHostPanel").classList.toggle("hidden", mode !== "host");
+  $("remoteUnattendedPanel").classList.toggle("hidden", mode !== "host");
+  $("remoteControllerPanel").classList.toggle("hidden", mode !== "controller");
+  if (mode === "host") {
+    refreshUnattendedStatus();
+    refreshAuditLog();
+  }
+}
+
+// -- Unattended Access (explicit opt-in) --------------------------------
+async function refreshUnattendedStatus() {
+  const st = await window.pywebview.api.remote_unattended_status();
+  $("remoteUnattendedToggle").checked = st.enabled;
+  $("remoteUnattendedInfo").classList.toggle("hidden", !st.enabled);
+  if (st.enabled) {
+    $("remoteUnattendedLabel").textContent = st.active ? "เปิดอยู่ — กำลังมีการเชื่อมต่อ" : "เปิดอยู่";
+    $("remoteUnattendedCode").textContent = st.connect_code;
+  } else {
+    $("remoteUnattendedLabel").textContent = "ปิดอยู่";
+  }
+}
+
+async function refreshAuditLog() {
+  const events = await window.pywebview.api.remote_audit_log();
+  const wrap = $("remoteAuditLog");
+  wrap.innerHTML = "";
+  if (!events.length) {
+    wrap.innerHTML = `<div class="remote-audit-entry">ยังไม่มีประวัติการเชื่อมต่อ</div>`;
+    return;
+  }
+  events.forEach((e) => {
+    const div = document.createElement("div");
+    const dt = new Date(e.time * 1000).toLocaleString("th-TH");
+    let text;
+    if (e.event === "connect_attempt") {
+      text = e.allowed
+        ? `✅ ${e.controller} เชื่อมต่อสำเร็จ${e.unattended ? " (Unattended)" : ""}`
+        : `⛔ ${e.controller} ถูกปฏิเสธ`;
+      if (!e.allowed) div.classList.add("denied");
+    } else if (e.event === "session_end") {
+      text = `⏹ ${e.controller} ตัดการเชื่อมต่อ (${e.duration_sec}s)`;
+    } else {
+      text = e.event;
+    }
+    div.className = `remote-audit-entry${div.classList.contains("denied") ? " denied" : ""}`;
+    div.innerHTML = `<span>${text}</span><span class="mono" style="color:var(--text-dim);white-space:nowrap;">${dt}</span>`;
+    wrap.appendChild(div);
+  });
+}
+
+async function toggleUnattended(enable) {
+  if (enable) {
+    const ok = await confirmDialog(
+      "เปิด Unattended Access",
+      "เครื่องนี้จะสามารถถูกผู้ดูแลระบบที่มีรหัสถาวรเชื่อมต่อเข้ามาได้ทันที โดยไม่ต้องขออนุญาตทุกครั้ง " +
+        "แต่จะยังมีกรอบเรืองแสง+ปุ่มตัดการเชื่อมต่อฉุกเฉินขึ้นทุกครั้งที่มีการเชื่อมต่อ และมีการบันทึกประวัติไว้เสมอ ต้องการเปิดหรือไม่?"
+    );
+    if (!ok) {
+      $("remoteUnattendedToggle").checked = false;
+      return;
+    }
+    const { connect_code } = await window.pywebview.api.remote_unattended_enable("This PC");
+    toast("เปิด Unattended Access แล้ว", "success");
+  } else {
+    const ok = await confirmDialog("ปิด Unattended Access", "ผู้ดูแลระบบจะไม่สามารถเชื่อมต่อแบบไม่ขออนุญาตได้อีกต่อไป ต้องการปิดหรือไม่?");
+    if (!ok) {
+      $("remoteUnattendedToggle").checked = true;
+      return;
+    }
+    await window.pywebview.api.remote_unattended_disable();
+    toast("ปิด Unattended Access แล้ว", "info");
+  }
+  refreshUnattendedStatus();
+  refreshAuditLog();
+}
+
+// -- Host (Get Help) ----------------------------------------------------
+async function startRemoteHost() {
+  $("btnRemoteHostStart").disabled = true;
+  $("btnRemoteHostStart").textContent = "กำลังเตรียม...";
+  const { code } = await window.pywebview.api.remote_host_start("This PC");
+  $("btnRemoteHostStart").disabled = false;
+  $("btnRemoteHostStart").textContent = "เริ่มรอการเชื่อมต่อ";
+  $("remoteHostIdle").classList.add("hidden");
+  $("remoteHostActive").classList.remove("hidden");
+  $("remoteHostCode").textContent = code;
+  $("remoteHostStatusText").textContent = "กำลังรอการเชื่อมต่อ...";
+  if (remoteState.hostTimer) clearInterval(remoteState.hostTimer);
+  remoteState.hostTimer = setInterval(pollRemoteHostStatus, 1000);
+}
+
+async function pollRemoteHostStatus() {
+  const st = await window.pywebview.api.remote_host_status();
+  const labels = {
+    waiting: "กำลังรอการเชื่อมต่อ...",
+    pending_permission: "มีคำขอเชื่อมต่อ — กำลังรอการยืนยันบนหน้าจอ (ป๊อปอัป Allow/Deny)",
+    active: "เชื่อมต่อแล้ว — กำลังแชร์หน้าจอ",
+    ended: "การเชื่อมต่อสิ้นสุดแล้ว",
+    idle: "ยังไม่เริ่ม",
+  };
+  $("remoteHostStatusText").textContent = labels[st.status] || st.status;
+  if (st.status === "ended") {
+    clearInterval(remoteState.hostTimer);
+    remoteState.hostTimer = null;
+    setTimeout(() => {
+      $("remoteHostActive").classList.add("hidden");
+      $("remoteHostIdle").classList.remove("hidden");
+    }, 1500);
+  }
+  if (st.last_action_result) {
+    toast(st.last_action_result.message, st.last_action_result.success ? "success" : "error");
+  }
+}
+
+async function stopRemoteHost() {
+  await window.pywebview.api.remote_host_stop();
+  toast("ตัดการเชื่อมต่อแล้ว", "info");
+}
+
+async function rebootAndResumeHost() {
+  const ok = await confirmDialog(
+    "รีสตาร์ทเครื่อง",
+    "เครื่องจะรีสตาร์ทใน 5 วินาที และจะกลับมารอเชื่อมต่อรหัสเดิมโดยอัตโนมัติหลังเปิดเครื่อง"
+  );
+  if (!ok) return;
+  await window.pywebview.api.remote_host_reboot_and_resume();
+  toast("กำลังรีสตาร์ท...", "info");
+}
+
+// -- Controller (Give Help) ---------------------------------------------
+async function connectRemoteController() {
+  const code = $("remoteCodeInput").value.trim();
+  if (!code || !code.includes("@")) {
+    toast("กรุณาวางรหัสเชื่อมต่อให้ครบ (รูปแบบ รหัส@IP:พอร์ต)", "error");
+    return;
+  }
+  const result = await window.pywebview.api.remote_controller_start(code, "Technician");
+  if (result && result.success === false) {
+    toast(result.message, "error");
+    return;
+  }
+  $("remoteControllerStatusText").textContent = "กำลังเชื่อมต่อ...";
+  if (remoteState.ctrlStatusTimer) clearInterval(remoteState.ctrlStatusTimer);
+  remoteState.ctrlStatusTimer = setInterval(pollRemoteControllerStatus, 1000);
+}
+
+async function pollRemoteControllerStatus() {
+  const st = await window.pywebview.api.remote_controller_status();
+  if (st.status === "active" && !remoteState.ctrlActive) {
+    remoteState.ctrlActive = true;
+    $("remoteControllerConnect").classList.add("hidden");
+    $("remoteControllerActive").classList.remove("hidden");
+    if (!remoteState.actionsLoaded) await loadRemoteActionButtons();
+    remoteState.ctrlFrameTimer = setInterval(pollRemoteFrame, 150);
+    remoteState.ctrlTelemetryTimer = setInterval(pollRemoteTelemetry, 2000);
+    remoteState.ctrlActionTimer = setInterval(pollRemoteActionResult, 1000);
+    toast("เชื่อมต่อสำเร็จ", "success");
+  } else if (st.status === "denied") {
+    $("remoteControllerStatusText").textContent = "ผู้ใช้ปฏิเสธคำขอเชื่อมต่อ";
+    clearInterval(remoteState.ctrlStatusTimer);
+  } else if (st.status === "ended") {
+    resetRemoteController();
+  } else if (st.status === "awaiting_permission") {
+    $("remoteControllerStatusText").textContent = "กำลังรอผู้ใช้ปลายทางกดยืนยัน...";
+  }
+}
+
+async function pollRemoteFrame() {
+  const frame = await window.pywebview.api.remote_controller_frame();
+  if (frame && frame.data) {
+    $("remoteCanvas").src = `data:image/jpeg;base64,${frame.data}`;
+    $("remoteCanvas").dataset.w = frame.w;
+    $("remoteCanvas").dataset.h = frame.h;
+  }
+}
+
+async function pollRemoteTelemetry() {
+  const t = await window.pywebview.api.remote_controller_telemetry();
+  if (!t) return;
+  const gpu = t.gpu ? `GPU: ${t.gpu.util_percent}%  ${t.gpu.temperature_c}°C` : "GPU: n/a";
+  const procs = t.top_processes
+    .slice(0, 6)
+    .map((p) => {
+      const hp = humanParts(p.memory);
+      return `  ${p.name}: ${hp.value.toFixed(1)}${hp.unit}`;
+    })
+    .join("\n");
+  const ramUsed = humanParts(t.ram.used);
+  const ramTotal = humanParts(t.ram.total);
+  $("remoteTelemetry").textContent =
+    `CPU: ${t.cpu_percent.toFixed(1)}%\n` +
+    `RAM: ${t.ram.percent.toFixed(1)}% (${ramUsed.value.toFixed(1)}${ramUsed.unit} / ${ramTotal.value.toFixed(1)}${ramTotal.unit})\n` +
+    `Disk: ${((t.disk.used / t.disk.total) * 100).toFixed(1)}% used\n` +
+    `${gpu}\n\nTop processes (RAM):\n${procs}`;
+}
+
+async function pollRemoteActionResult() {
+  const r = await window.pywebview.api.remote_controller_action_result();
+  if (r) toast(r.message, r.success ? "success" : "error");
+}
+
+async function loadRemoteActionButtons() {
+  remoteState.actionsLoaded = true;
+  const actionsList = await window.pywebview.api.remote_list_actions();
+  const wrap = $("remoteActionButtons");
+  wrap.innerHTML = "";
+  actionsList.forEach((a) => {
+    const btn = document.createElement("button");
+    btn.className = "btn btn-ghost";
+    btn.textContent = a.label;
+    btn.addEventListener("click", () => window.pywebview.api.remote_controller_request_action(a.id));
+    wrap.appendChild(btn);
+  });
+}
+
+async function requestRemoteDiagnosticReport() {
+  await window.pywebview.api.remote_controller_request_diagnostic_report();
+  toast("กำลังขอรายงานสถานะเครื่อง...", "info");
+  const poll = setInterval(async () => {
+    const report = await window.pywebview.api.remote_controller_diagnostic_report();
+    if (report) {
+      clearInterval(poll);
+      renderRemoteDiagnosticReport(report);
+    }
+  }, 800);
+  setTimeout(() => clearInterval(poll), 15000);
+}
+
+function renderRemoteDiagnosticReport(report) {
+  const wrap = $("remoteDiagnosticReport");
+  wrap.innerHTML = "";
+  if (!report.available || !report.entries.length) {
+    wrap.innerHTML = `<div class="remote-diag-entry">ไม่พบข้อผิดพลาดล่าสุด หรือไม่สามารถอ่าน Event Log ได้</div>`;
+    return;
+  }
+  report.entries.forEach((e) => {
+    const div = document.createElement("div");
+    div.className = `remote-diag-entry type-${e.type}`;
+    div.textContent = `[${e.channel}] ${e.source} (#${e.event_id}) — ${e.time}\n${e.message}`;
+    wrap.appendChild(div);
+  });
+}
+
+function remoteCanvasCoords(ev) {
+  const img = $("remoteCanvas");
+  const w = Number(img.dataset.w), h = Number(img.dataset.h);
+  if (!w || !h) return null;
+  const rect = img.getBoundingClientRect();
+  const x = Math.round(((ev.clientX - rect.left) / rect.width) * w);
+  const y = Math.round(((ev.clientY - rect.top) / rect.height) * h);
+  return { x, y };
+}
+
+function handleRemoteCanvasMove(ev) {
+  const now = Date.now();
+  if (now - remoteState.lastMoveSent < 60) return;
+  remoteState.lastMoveSent = now;
+  const coords = remoteCanvasCoords(ev);
+  if (coords) window.pywebview.api.remote_controller_input("move", coords);
+}
+
+function handleRemoteCanvasClick(ev) {
+  const coords = remoteCanvasCoords(ev);
+  if (coords) window.pywebview.api.remote_controller_input("click", { ...coords, button: ev.button === 2 ? "right" : "left" });
+}
+
+function handleRemoteCanvasWheel(ev) {
+  ev.preventDefault();
+  window.pywebview.api.remote_controller_input("scroll", { amount: ev.deltaY < 0 ? 100 : -100 });
+}
+
+function resetRemoteController() {
+  clearInterval(remoteState.ctrlStatusTimer);
+  clearInterval(remoteState.ctrlFrameTimer);
+  clearInterval(remoteState.ctrlTelemetryTimer);
+  clearInterval(remoteState.ctrlActionTimer);
+  remoteState.ctrlActive = false;
+  remoteState.actionsLoaded = false;
+  $("remoteControllerActive").classList.add("hidden");
+  $("remoteControllerConnect").classList.remove("hidden");
+  $("remoteControllerStatusText").textContent = "";
+  $("remoteCodeInput").value = "";
+  $("remoteDiagnosticReport").innerHTML = "";
+}
+
+async function disconnectRemoteController() {
+  await window.pywebview.api.remote_controller_stop();
+  resetRemoteController();
+}
+
+function initRemote() {
+  $("btnRemoteModeHost").addEventListener("click", () => setRemoteMode("host"));
+  $("btnRemoteModeController").addEventListener("click", () => setRemoteMode("controller"));
+  $("btnRemoteHostStart").addEventListener("click", startRemoteHost);
+  $("btnRemoteHostCopy").addEventListener("click", async () => {
+    await navigator.clipboard.writeText($("remoteHostCode").textContent);
+    toast("คัดลอกรหัสแล้ว", "success");
+  });
+  $("btnRemoteHostStop").addEventListener("click", stopRemoteHost);
+  $("btnRemoteHostReboot").addEventListener("click", rebootAndResumeHost);
+  $("remoteHostViewOnly").addEventListener("change", (e) =>
+    window.pywebview.api.remote_host_set_view_only(e.target.checked)
+  );
+
+  $("remoteUnattendedToggle").addEventListener("change", (e) => toggleUnattended(e.target.checked));
+  $("btnRemoteUnattendedCopy").addEventListener("click", async () => {
+    await navigator.clipboard.writeText($("remoteUnattendedCode").textContent);
+    toast("คัดลอกรหัสแล้ว", "success");
+  });
+
+  $("btnRemoteConnect").addEventListener("click", connectRemoteController);
+  $("btnRemoteDisconnect").addEventListener("click", disconnectRemoteController);
+  $("remoteControllerViewOnly").addEventListener("change", (e) =>
+    window.pywebview.api.remote_controller_set_view_only(e.target.checked)
+  );
+  $("btnRemoteDiagnostic").addEventListener("click", requestRemoteDiagnosticReport);
+
+  const canvas = $("remoteCanvas");
+  canvas.addEventListener("mousemove", handleRemoteCanvasMove);
+  canvas.addEventListener("click", handleRemoteCanvasClick);
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  canvas.addEventListener("wheel", handleRemoteCanvasWheel, { passive: false });
 }
 
 if (window.pywebview) {
