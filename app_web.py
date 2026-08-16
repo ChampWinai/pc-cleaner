@@ -4,6 +4,7 @@ Run with: python app_web.py
 """
 
 import os
+import sys
 
 import webview
 
@@ -15,6 +16,13 @@ WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 
 
 def main():
+    if "--auto-clean" in sys.argv:
+        # Headless entry point invoked by the "PCCleaner_AutoClean" Scheduled
+        # Task -- no window, just scan/clean the safe targets and exit.
+        backend.purge_expired_vault_entries()
+        backend.run_auto_clean(deep="--deep" in sys.argv)
+        return
+
     backend.purge_expired_vault_entries()
     api = Api()
     window = webview.create_window(

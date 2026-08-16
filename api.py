@@ -20,7 +20,12 @@ class Api:
         self.controller_session = None
 
     def scan(self, deep=False):
-        return backend.scan(deep=deep)
+        def on_progress(label):
+            if self.window:
+                safe_label = label.replace("\\", "\\\\").replace("'", "\\'")
+                self.window.evaluate_js(f"window.onScanProgress && window.onScanProgress('{safe_label}')")
+
+        return backend.scan(deep=deep, on_progress=on_progress)
 
     def get_children(self, path):
         return backend.list_children(path)
@@ -140,6 +145,25 @@ class Api:
     def vault_file(self, path, label):
         entry = backend.move_to_vault(path, f"privacy_{backend.uuid.uuid4().hex[:6]}", label)
         return {"success": True, "id": entry["id"]}
+
+    # -- Auto Clean (hourly Scheduled Task) ---------------------------------
+    def auto_clean_status(self):
+        status = backend.auto_clean_status()
+        if status.get("last_run"):
+            status["last_run"]["ran_at_date"] = status["last_run"]["ran_at"].split("T")[0]
+        return status
+
+    def auto_clean_enable(self, interval_hours, deep):
+        success, message = backend.auto_clean_enable(interval_hours=interval_hours, deep=deep)
+        return {"success": success, "message": message}
+
+    def auto_clean_disable(self):
+        return {"success": backend.auto_clean_disable()}
+
+    def auto_clean_run_now(self, deep=False):
+        entry = backend.run_auto_clean(deep=deep)
+        entry["ran_at_date"] = entry["ran_at"].split("T")[0]
+        return entry
 
     # -- Hardware & Driver update check ------------------------------------
     def list_drivers(self):

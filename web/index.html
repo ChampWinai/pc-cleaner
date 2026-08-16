@@ -99,6 +99,25 @@
         </div>
         <button class="btn btn-accent" id="btnDocker" disabled>ล้าง Cache</button>
       </div>
+
+      <div class="glass glow-hover card" style="--glow-rgb: var(--purple-rgb);">
+        <div class="card-icon">🤖</div>
+        <div class="card-body">
+          <div class="card-title">ล้างอัตโนมัติ</div>
+          <div class="card-value muted" id="autoCleanText">ปิดอยู่</div>
+          <select id="autoCleanInterval" class="auto-clean-select">
+            <option value="1">ทุก 1 ชม.</option>
+            <option value="3">ทุก 3 ชม.</option>
+            <option value="6">ทุก 6 ชม.</option>
+            <option value="12">ทุก 12 ชม.</option>
+            <option value="24">ทุก 24 ชม.</option>
+          </select>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="autoCleanToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
     </section>
 
     <div class="toggle-row">

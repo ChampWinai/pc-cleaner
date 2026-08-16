@@ -79,6 +79,10 @@ function confirmDialog(title, body) {
 // ---------------------------------------------------------------------
 // Scan + list rendering
 // ---------------------------------------------------------------------
+window.onScanProgress = (label) => {
+  $("statusText").textContent = `กำลังสแกน... (${label})`;
+};
+
 async function scan() {
   $("statusText").textContent = "กำลังสแกน...";
   $("btnCleanSelected").disabled = true;
@@ -430,6 +434,54 @@ async function cleanDocker() {
 }
 
 // ---------------------------------------------------------------------
+// Auto Clean (hourly Scheduled Task)
+// ---------------------------------------------------------------------
+function formatLastRun(lastRun) {
+  if (!lastRun) return "ยังไม่เคยรัน";
+  const time = lastRun.ran_at.split("T")[1]?.slice(0, 5) || "";
+  return `รันล่าสุด ${lastRun.ran_at_date} ${time} — ล้างได้ ${lastRun.freed_human}`;
+}
+
+async function refreshAutoCleanStatus() {
+  const status = await window.pywebview.api.auto_clean_status();
+  $("autoCleanToggle").checked = status.task_active;
+  $("autoCleanInterval").value = String(status.interval_hours || 1);
+  $("autoCleanInterval").disabled = !status.task_active;
+  $("autoCleanText").textContent = status.task_active
+    ? formatLastRun(status.last_run)
+    : "ปิดอยู่ — ล้างเฉพาะรายการที่ปลอดภัย 100%";
+  return status;
+}
+
+async function toggleAutoClean() {
+  const toggle = $("autoCleanToggle");
+  const wantOn = toggle.checked;
+  toggle.disabled = true;
+  if (wantOn) {
+    const hours = Number($("autoCleanInterval").value);
+    const result = await window.pywebview.api.auto_clean_enable(hours, false);
+    if (result.success) toast(`เปิดล้างอัตโนมัติทุก ${hours} ชม. แล้ว (เฉพาะรายการปลอดภัย)`, "success");
+    else {
+      toast(result.message || "เปิดใช้งานไม่สำเร็จ", "error");
+      toggle.checked = false;
+    }
+  } else {
+    await window.pywebview.api.auto_clean_disable();
+    toast("ปิดล้างอัตโนมัติแล้ว", "info");
+  }
+  toggle.disabled = false;
+  await refreshAutoCleanStatus();
+}
+
+async function changeAutoCleanInterval() {
+  if (!$("autoCleanToggle").checked) return;
+  const hours = Number($("autoCleanInterval").value);
+  await window.pywebview.api.auto_clean_enable(hours, false);
+  toast(`ปรับเป็นล้างทุก ${hours} ชม. แล้ว`, "success");
+  await refreshAutoCleanStatus();
+}
+
+// ---------------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------------
 function switchTab(name) {
@@ -775,6 +827,8 @@ function init() {
   $("btnCheckDrivers").addEventListener("click", checkDriverUpdates);
   $("btnOpenWU").addEventListener("click", openWindowsUpdate);
   $("deepToggle").addEventListener("change", scan);
+  $("autoCleanToggle").addEventListener("change", toggleAutoClean);
+  $("autoCleanInterval").addEventListener("change", changeAutoCleanInterval);
   window.addEventListener("resize", renderTreemap);
   document.querySelectorAll(".tab-btn").forEach((b) =>
     b.addEventListener("click", () => switchTab(b.dataset.tab))
@@ -784,6 +838,7 @@ function init() {
   refreshRam();
   refreshVaultCount();
   initDocker();
+  refreshAutoCleanStatus();
   state.ramTimer = setInterval(refreshRam, 5000);
 
   initRemote();

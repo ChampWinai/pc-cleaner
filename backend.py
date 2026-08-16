@@ -4,6 +4,7 @@ Pure Python, no UI toolkit imports here — this module is called from the
 pywebview JS bridge (api.py) and could equally be unit-tested standalone.
 """
 
+import concurrent.futures
 import ctypes
 import glob
 import json
@@ -11,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import uuid
 import winreg
 from datetime import datetime, timedelta
@@ -29,13 +31,26 @@ def human_size(num_bytes):
 
 
 def dir_size(path):
+    """Sum file sizes under `path`. Uses os.scandir (not os.walk +
+    os.path.getsize) so each file is stat'd once instead of twice -- matters
+    a lot for cache folders with tens of thousands of small files.
+    """
     total = 0
-    for root, _dirs, files in os.walk(path, onerror=lambda e: None):
-        for name in files:
-            try:
-                total += os.path.getsize(os.path.join(root, name))
-            except OSError:
-                pass
+    stack = [path]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(entry.path)
+                        else:
+                            total += entry.stat(follow_symlinks=False).st_size
+                    except OSError:
+                        pass
+        except OSError:
+            pass
     return total
 
 
@@ -64,6 +79,14 @@ IMPACT_NOTES = [
     ("OneDrive", "low", "ไฟล์ log ของ OneDrive ปลอดภัยที่จะลบ ไม่กระทบไฟล์ที่ sync อยู่"),
     ("Dropbox Cache", "low", "Dropbox เก็บไฟล์ที่ลบ/แก้ล่าสุดไว้กู้คืนชั่วคราว ลบแล้วกู้คืนผ่าน Dropbox เองไม่ได้ชั่วคราว"),
     ("Google Drive Cache", "low", "Google Drive จะดาวน์โหลดไฟล์ใหม่ตามต้องการเมื่อเปิดใช้งานอีกครั้ง"),
+    ("npm Cache", "safe", "ปลอดภัย — npm จะดาวน์โหลด package ใหม่ตอน install ครั้งถัดไป"),
+    ("Yarn Cache", "safe", "ปลอดภัย — Yarn จะดาวน์โหลด package ใหม่ตอน install ครั้งถัดไป"),
+    ("pip Cache", "safe", "ปลอดภัย — pip จะดาวน์โหลด package ใหม่ตอนติดตั้งครั้งถัดไป"),
+    ("Discord Cache", "low", "Discord โหลดรูป/สติกเกอร์ช้าลงชั่วคราว ไม่กระทบการล็อกอิน"),
+    ("Slack Cache", "low", "Slack โหลดรูป/ไฟล์แนบช้าลงชั่วคราว ไม่กระทบการล็อกอิน"),
+    ("Spotify Cache", "low", "เพลงที่เคยฟังจะโหลดใหม่จากอินเทอร์เน็ตอีกครั้ง ไม่กระทบเพลย์ลิสต์"),
+    ("VS Code Cache", "safe", "ปลอดภัย — VS Code จะสร้างแคชใหม่เองตอนเปิดครั้งถัดไป"),
+    ("JetBrains Cache", "medium", "ระวัง — IDE อาจ re-index โปรเจกต์ใหม่ตอนเปิดครั้งถัดไป อาจใช้เวลาสักครู่"),
 ]
 
 
@@ -112,6 +135,7 @@ def get_targets(deep=False):
         ]
         candidates += _expand_dev_tool_targets(env)
         candidates += _expand_shader_cloud_targets(env)
+        candidates += _expand_app_cache_targets(env)
     return [(label, path) for label, path in candidates if path and os.path.isdir(path)]
 
 
@@ -167,6 +191,32 @@ def _expand_shader_cloud_targets(env):
     return out
 
 
+def _expand_app_cache_targets(env):
+    """Package-manager and Chromium-based desktop-app caches -- another
+    category of "deep clean" folders that routinely grow into multiple GB
+    but aren't covered by the standard temp/browser targets above.
+    """
+    local = env.get("LOCALAPPDATA", "")
+    appdata = env.get("APPDATA", "")
+
+    fixed = [
+        ("npm Cache", os.path.join(appdata, "npm-cache")),
+        ("Yarn Cache", os.path.join(local, "Yarn", "Cache")),
+        ("pip Cache", os.path.join(local, "pip", "Cache")),
+        ("Discord Cache", os.path.join(appdata, "discord", "Cache")),
+        ("Slack Cache", os.path.join(appdata, "Slack", "Cache")),
+        ("Spotify Cache", os.path.join(local, "Spotify", "Storage")),
+        ("VS Code Cache", os.path.join(appdata, "Code", "Cache")),
+    ]
+    out = [(label, path) for label, path in fixed]
+
+    for m in glob.glob(os.path.join(local, "JetBrains", "*", "caches")):
+        suffix = f" ({os.path.basename(os.path.dirname(m))})"
+        out.append(("JetBrains Cache" + suffix, m))
+
+    return out
+
+
 def list_children(path, limit=24):
     """Return the immediate children of `path` sorted by size, for treemap
     drill-down. Each child's size is computed on demand (full walk for
@@ -207,14 +257,31 @@ def list_children(path, limit=24):
     return items
 
 
-def scan(deep=False):
-    """Return a list of {label, path, size, risk, note} for non-empty targets."""
+def scan(deep=False, on_progress=None):
+    """Return a list of {label, path, size, risk, note} for non-empty targets.
+
+    Targets are measured concurrently (dir_size is I/O-bound and releases the
+    GIL during syscalls) instead of one at a time -- with a dozen-plus deep
+    targets, several of which are slow multi-thousand-file caches, scanning
+    them serially means the slowest folder gates every other one instead of
+    overlapping with them.
+
+    on_progress(label), if given, is called as each target finishes -- lets
+    the UI show which folder was just measured instead of a static
+    "scanning..." with no feedback during a slow folder.
+    """
+    targets = get_targets(deep=deep)
     found = []
-    for label, path in get_targets(deep=deep):
-        size = dir_size(path)
-        if size > 0:
-            risk, note = get_impact(label)
-            found.append({"label": label, "path": path, "size": size, "risk": risk, "note": note})
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_target = {executor.submit(dir_size, path): (label, path) for label, path in targets}
+        for future in concurrent.futures.as_completed(future_to_target):
+            label, path = future_to_target[future]
+            if on_progress:
+                on_progress(label)
+            size = future.result()
+            if size > 0:
+                risk, note = get_impact(label)
+                found.append({"label": label, "path": path, "size": size, "risk": risk, "note": note})
     found.sort(key=lambda it: it["size"], reverse=True)
     return found
 
@@ -352,14 +419,21 @@ def vault_list():
     return sorted(_load_vault_index(), key=lambda e: e["deleted_at"], reverse=True)
 
 
-def move_to_vault(original_path, batch_id, label):
+def _move_to_vault_no_index(original_path, batch_id, label):
+    """Move a file/folder into the vault and build its index entry, without
+    touching the index file. Callers that move many items in one batch
+    (clean_items) use this and write the index once at the end instead of
+    once per item -- reading + rewriting the whole JSON index per file turns
+    an N-file clean into an O(N^2) operation, which is painfully slow once a
+    cache folder has tens of thousands of small files.
+    """
     os.makedirs(os.path.join(VAULT_DIR, batch_id), exist_ok=True)
     size = os.path.getsize(original_path) if os.path.isfile(original_path) else dir_size(original_path)
     vault_name = f"{uuid.uuid4().hex}_{os.path.basename(original_path)}"
     vault_path = os.path.join(VAULT_DIR, batch_id, vault_name)
     shutil.move(original_path, vault_path)
 
-    entry = {
+    return {
         "id": uuid.uuid4().hex,
         "label": label,
         "original_path": original_path,
@@ -367,6 +441,10 @@ def move_to_vault(original_path, batch_id, label):
         "size": size,
         "deleted_at": datetime.now().isoformat(),
     }
+
+
+def move_to_vault(original_path, batch_id, label):
+    entry = _move_to_vault_no_index(original_path, batch_id, label)
     entries = _load_vault_index()
     entries.append(entry)
     _save_vault_index(entries)
@@ -436,6 +514,7 @@ def clean_items(selected):
     """
     errors = []
     freed = 0
+    new_entries = []
     batch_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     for it in selected:
         path = it["path"]
@@ -444,11 +523,17 @@ def clean_items(selected):
         for entry in os.listdir(path):
             full = os.path.join(path, entry)
             try:
-                size_before = os.path.getsize(full) if os.path.isfile(full) else dir_size(full)
-                move_to_vault(full, batch_id, it["label"])
-                freed += size_before
+                vault_entry = _move_to_vault_no_index(full, batch_id, it["label"])
+                new_entries.append(vault_entry)
+                freed += vault_entry["size"]
             except OSError as e:
                 errors.append(f"{full}: {e}")
+
+    if new_entries:
+        entries = _load_vault_index()
+        entries.extend(new_entries)
+        _save_vault_index(entries)
+
     return freed, errors, batch_id
 
 
@@ -1069,3 +1154,136 @@ def open_windows_update():
         return True
     except OSError:
         return False
+
+
+# ---------------------------------------------------------------------------
+# Auto Clean — recurring background clean via a native Windows Scheduled
+# Task, so it keeps running even when the app window is closed. The task
+# re-launches this same app with an --auto-clean flag (see app_web.py),
+# which runs headlessly (no window) and exits.
+#
+# Auto-run only ever touches risk == "safe" targets. Anything the app itself
+# flags as "low"/"medium"/"high" impact needs a human looking at the list,
+# so those are left for the user to clear manually in the normal scan UI.
+# ---------------------------------------------------------------------------
+AUTO_CLEAN_TASK_NAME = "PCCleaner_AutoClean"
+AUTO_CLEAN_SETTINGS_PATH = os.path.join(VAULT_DIR, "auto_clean_settings.json")
+AUTO_CLEAN_LOG_PATH = os.path.join(VAULT_DIR, "auto_clean_log.json")
+
+
+def _load_json(path, default):
+    if not os.path.isfile(path):
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def _save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _auto_clean_launch_command():
+    """Build the command line the Scheduled Task should run to re-launch
+    this app headlessly. Handles both the frozen PyInstaller exe (normal
+    install) and running straight from source (dev).
+    """
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}" --auto-clean'
+
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_web.py")
+    pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+    interpreter = pythonw if os.path.isfile(pythonw) else sys.executable
+    return f'"{interpreter}" "{script}" --auto-clean'
+
+
+def run_auto_clean(deep=False):
+    """Scan and clean only "safe"-impact targets, then record the result to
+    the auto-clean log. Called both from the scheduled headless run and
+    (optionally) as an on-demand "run now" from the UI.
+    """
+    found = scan(deep=deep)
+    safe_items = [it for it in found if it["risk"] == "safe"]
+    freed, errors, _batch_id = clean_items(safe_items) if safe_items else (0, [], None)
+
+    entry = {
+        "ran_at": datetime.now().isoformat(),
+        "deep": deep,
+        "items_cleaned": len(safe_items),
+        "freed": freed,
+        "freed_human": human_size(freed),
+        "errors": errors,
+    }
+    _save_json(AUTO_CLEAN_LOG_PATH, entry)
+    return entry
+
+
+def auto_clean_last_run():
+    return _load_json(AUTO_CLEAN_LOG_PATH, None)
+
+
+def auto_clean_settings():
+    return _load_json(AUTO_CLEAN_SETTINGS_PATH, {"enabled": False, "interval_hours": 1, "deep": False})
+
+
+def auto_clean_task_exists():
+    try:
+        result = subprocess.run(
+            ["schtasks", "/query", "/tn", AUTO_CLEAN_TASK_NAME],
+            capture_output=True, text=True, timeout=15,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def auto_clean_status():
+    settings = auto_clean_settings()
+    settings["task_active"] = auto_clean_task_exists()
+    settings["last_run"] = auto_clean_last_run()
+    return settings
+
+
+def auto_clean_enable(interval_hours=1, deep=False):
+    """Register (or update) the hourly-by-default Scheduled Task.
+
+    /rl highest matches this app's own uac_admin manifest -- without it the
+    task would run at standard rights and silently fail to touch anything
+    under C:\\Windows.
+    """
+    interval_hours = max(1, min(24, int(interval_hours)))
+    command = _auto_clean_launch_command()
+    if deep:
+        command += " --deep"
+    try:
+        subprocess.run(
+            ["schtasks", "/create", "/tn", AUTO_CLEAN_TASK_NAME, "/tr", command,
+             "/sc", "hourly", "/mo", str(interval_hours), "/rl", "highest", "/f"],
+            capture_output=True, text=True, timeout=15, check=True,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return False, "สร้าง Scheduled Task ไม่สำเร็จ — ต้องรันโปรแกรมแบบ Administrator"
+
+    _save_json(AUTO_CLEAN_SETTINGS_PATH, {
+        "enabled": True, "interval_hours": interval_hours, "deep": deep,
+    })
+    return True, ""
+
+
+def auto_clean_disable():
+    try:
+        subprocess.run(
+            ["schtasks", "/delete", "/tn", AUTO_CLEAN_TASK_NAME, "/f"],
+            capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+    settings = auto_clean_settings()
+    settings["enabled"] = False
+    _save_json(AUTO_CLEAN_SETTINGS_PATH, settings)
+    return True

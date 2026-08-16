@@ -315,6 +315,11 @@ body::before {
   box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--accent-2);
 }
 
+.auto-clean-select {
+  margin-top: 6px; font-size: 11px; color: var(--text); background: var(--track);
+  border: 1px solid var(--glass-border); border-radius: 6px; padding: 3px 6px; max-width: 100px;
+}
+
 .toggle-row { display: flex; align-items: center; gap: 10px; padding: 2px 4px; }
 .toggle-label { font-size: 12px; color: var(--text-dim); }
 .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
