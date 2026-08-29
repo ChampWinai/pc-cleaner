@@ -14,6 +14,11 @@ from history_db import history_db
 from update_checker import UpdateChecker
 from task_scheduler import TaskSchedulerManager
 from operation_context import OperationContext
+from i18n import i18n, _
+from notifications import tray_manager, notification_manager
+from email_reports import email_reporter, ScheduledEmailReports
+from advanced_features import benchmark, cost_analysis, keyboard_shortcuts, duplicate_finder
+from security_compliance import pii_detector, two_factor, audit_logger, gdpr_mode
 
 log = logging.getLogger(__name__)
 
@@ -26,8 +31,197 @@ class Api:
         self.window = None  # set by app_web.py after the window is created
 
     # ========================================================================
-    # SCANNING & CLEANING
+    # INTERNATIONALIZATION
     # ========================================================================
+
+    def get_language(self):
+        """Get current language."""
+        return i18n.get_current_language()
+
+    def set_language(self, language: str):
+        """Set language (en or th)."""
+        success = i18n.set_language(language)
+        return {"success": success, "language": i18n.language}
+
+    def get_available_languages(self):
+        """Get available languages."""
+        return i18n.get_available_languages()
+
+    def translate_all(self):
+        """Get all translations for current language."""
+        return i18n.get_all_translations()
+
+    # ========================================================================
+    # SYSTEM TRAY & NOTIFICATIONS
+    # ========================================================================
+
+    def show_tray_icon(self):
+        """Show system tray icon."""
+        success = tray_manager.show()
+        return {"success": success}
+
+    def hide_tray_icon(self):
+        """Hide system tray icon."""
+        success = tray_manager.hide()
+        return {"success": success}
+
+    def send_notification(self, title: str, message: str, duration: int = 5):
+        """Send desktop notification."""
+        success = notification_manager.notify(title, message, duration)
+        return {"success": success}
+
+    def notify_scan_complete(self, items_found: int, total_size: str):
+        """Notify scan completion."""
+        success = notification_manager.notify_scan_complete(items_found, total_size)
+        return {"success": success}
+
+    def notify_clean_complete(self, freed: str, errors: int = 0):
+        """Notify clean completion."""
+        success = notification_manager.notify_clean_complete(freed, errors)
+        return {"success": success}
+
+    def notify_update_available(self, version: str):
+        """Notify about update."""
+        success = notification_manager.notify_update_available(version)
+        return {"success": success}
+
+    # ========================================================================
+    # EMAIL REPORTS
+    # ========================================================================
+
+    def set_email_credentials(self, email: str, password: str):
+        """Set email credentials for reporting."""
+        success = email_reporter.set_credentials(email, password)
+        return {"success": success}
+
+    def send_scan_report(self, recipient_email: str, scan_type: str, items_found: int,
+                        total_size_bytes: int, duration_seconds: float):
+        """Send scan report via email."""
+        success = email_reporter.send_scan_report(
+            recipient_email, scan_type, items_found, total_size_bytes, duration_seconds
+        )
+        return {"success": success}
+
+    def send_cleaning_report(self, recipient_email: str, freed_bytes: int, items_cleaned: int):
+        """Send cleaning report via email."""
+        success = email_reporter.send_cleaning_report(recipient_email, freed_bytes, items_cleaned)
+        return {"success": success}
+
+    # ========================================================================
+    # PERFORMANCE BENCHMARKING
+    # ========================================================================
+
+    def benchmark_capture_baseline(self):
+        """Capture baseline performance."""
+        baseline = benchmark.capture_baseline()
+        return baseline
+
+    def benchmark_capture_current(self):
+        """Capture current performance."""
+        current = benchmark.capture_current()
+        return current
+
+    def benchmark_get_improvement(self):
+        """Get performance improvements."""
+        improvement = benchmark.get_improvement()
+        return improvement
+
+    # ========================================================================
+    # COST ANALYSIS
+    # ========================================================================
+
+    def calculate_cost_saved(self, freed_bytes: int, region: str = 'thailand'):
+        """Calculate monetary value of freed space."""
+        result = cost_analysis.calculate_saved_cost(freed_bytes, region)
+        return result
+
+    # ========================================================================
+    # KEYBOARD SHORTCUTS
+    # ========================================================================
+
+    def get_keyboard_shortcuts(self):
+        """Get all keyboard shortcuts."""
+        return keyboard_shortcuts.get_all_shortcuts()
+
+    def get_shortcuts_help(self):
+        """Get formatted shortcuts help."""
+        return keyboard_shortcuts.get_help_text()
+
+    # ========================================================================
+    # DUPLICATE FINDER
+    # ========================================================================
+
+    def find_duplicates_by_hash(self, folder: str, extensions=None):
+        """Find duplicate files by content hash."""
+        result = duplicate_finder.find_by_hash(folder, extensions)
+        return result
+
+    def find_duplicates_by_name(self, folder: str):
+        """Find duplicate files by name."""
+        result = duplicate_finder.find_by_name(folder)
+        return result
+
+    # ========================================================================
+    # SECURITY & COMPLIANCE
+    # ========================================================================
+
+    def scan_pii_folder(self, folder: str):
+        """Scan folder for personally identifiable information."""
+        findings = pii_detector.scan_folder(folder)
+        return findings
+
+    def request_2fa_confirmation(self, operation_name: str):
+        """Request 2FA confirmation for sensitive operation."""
+        op_id = f"op_{backend.uuid.uuid4().hex[:8]}"
+        success = two_factor.request_confirmation(op_id, operation_name)
+        return {"success": success, "operation_id": op_id}
+
+    def confirm_2fa_operation(self, operation_id: str):
+        """Confirm a 2FA protected operation."""
+        success = two_factor.confirm_operation(operation_id)
+        return {"success": success}
+
+    def is_operation_confirmed(self, operation_id: str):
+        """Check if operation has valid 2FA confirmation."""
+        confirmed = two_factor.is_confirmed(operation_id)
+        return {"confirmed": confirmed}
+
+    def export_audit_log(self, output_file: str, format: str = 'csv', days: int = 30):
+        """Export audit log to file."""
+        if format == 'csv':
+            success = audit_logger.export_csv(output_file, days)
+        elif format == 'json':
+            success = audit_logger.export_json(output_file, days)
+        else:
+            return {"success": False, "error": "Invalid format"}
+        return {"success": success, "file": output_file}
+
+    def enable_gdpr_mode(self):
+        """Enable GDPR compliance mode."""
+        success = gdpr_mode.enable()
+        return {"success": success}
+
+    def disable_gdpr_mode(self):
+        """Disable GDPR compliance mode."""
+        success = gdpr_mode.disable()
+        return {"success": success}
+
+    def purge_user_data(self, user_identifier: str):
+        """Purge all user data (GDPR right-to-be-forgotten)."""
+        success = gdpr_mode.purge_user_data(user_identifier)
+        audit_logger.log_event(
+            event_type='gdpr',
+            user='system',
+            action='purge_data',
+            resource=user_identifier,
+            status='success' if success else 'failed'
+        )
+        return {"success": success}
+
+    # ========================================================================
+    # SCANNING & CLEANING (EXISTING)
+    # ========================================================================
+
 
     def scan(self, deep=False):
         def on_progress(label):

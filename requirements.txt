@@ -3,5 +3,10 @@ psutil>=6.0
 pywin32>=306
 requests>=2.31
 
+# UI & Notifications
+pystray>=0.19  # System tray icon
+Pillow>=10.0  # Image processing for tray icon
+win10toast>=0.9  # Windows 10 toast notifications
+
 # Dev / testing
 pytest>=8.0
