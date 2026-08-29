@@ -21,6 +21,10 @@ import psutil
 import pythoncom
 import win32com.client
 
+from logging_setup import get_logger
+
+log = get_logger(__name__)
+
 
 def human_size(num_bytes):
     for unit in ("B", "KB", "MB", "GB", "TB"):
@@ -476,7 +480,7 @@ def purge_vault_entry(entry_id):
         try:
             os.remove(match["vault_path"])
         except OSError:
-            pass
+            log.warning("Failed to remove vault file %s", match["vault_path"], exc_info=True)
     entries.remove(match)
     _save_vault_index(entries)
 
@@ -499,7 +503,7 @@ def purge_expired_vault_entries():
                 try:
                     os.remove(path)
                 except OSError:
-                    pass
+                    log.warning("Failed to remove expired vault entry %s", path, exc_info=True)
         else:
             still_valid.append(entry)
     _save_vault_index(still_valid)
@@ -527,6 +531,7 @@ def clean_items(selected):
                 new_entries.append(vault_entry)
                 freed += vault_entry["size"]
             except OSError as e:
+                log.warning("Failed to vault %s: %s", full, e)
                 errors.append(f"{full}: {e}")
 
     if new_entries:
@@ -644,6 +649,7 @@ def uninstall_app(uninstall_string):
         subprocess.Popen(uninstall_string, shell=True)
         return True
     except OSError:
+        log.warning("Failed to launch uninstaller: %s", uninstall_string, exc_info=True)
         return False
 
 
@@ -777,6 +783,7 @@ def disable_startup_item(item_id):
                 value, _ = winreg.QueryValueEx(key, name)
                 winreg.DeleteValue(key, name)
         except OSError:
+            log.warning("Failed to disable registry startup item %s", item_id, exc_info=True)
             return False, "ต้องรันโปรแกรมแบบ Administrator เพื่อปิดรายการนี้"
 
         backups = _load_startup_backup()
@@ -794,6 +801,7 @@ def disable_startup_item(item_id):
         try:
             shutil.move(original_path, backup_path)
         except OSError:
+            log.warning("Failed to move startup shortcut %s", original_path, exc_info=True)
             return False, "ย้ายไฟล์ shortcut ไม่สำเร็จ"
 
         backups = _load_startup_backup()
@@ -820,12 +828,14 @@ def enable_startup_item(item_id):
             with winreg.OpenKey(root, subpath, 0, winreg.KEY_ALL_ACCESS) as key:
                 winreg.SetValueEx(key, match["name"], 0, winreg.REG_SZ, match["command"])
         except OSError:
+            log.warning("Failed to enable registry startup item %s", item_id, exc_info=True)
             return False, "ต้องรันโปรแกรมแบบ Administrator เพื่อเปิดรายการนี้"
     elif match["source"] == "folder":
         original_path = match.get("_original_path", os.path.join(match["keypath"], match["name"]))
         try:
             shutil.move(match["command"], original_path)
         except OSError:
+            log.warning("Failed to restore startup shortcut for %s", item_id, exc_info=True)
             return False, "ย้ายไฟล์ shortcut กลับไม่สำเร็จ"
 
     backups.remove(match)
@@ -847,6 +857,7 @@ def delay_startup_item(item_id, delay_minutes=2):
             command, _ = winreg.QueryValueEx(key, name)
             winreg.DeleteValue(key, name)
     except OSError:
+        log.warning("Failed to remove Run key for delayed startup item %s", item_id, exc_info=True)
         return False, "ต้องรันโปรแกรมแบบ Administrator เพื่อหน่วงเวลารายการนี้"
 
     task_name = f"PCCleaner_Delay_{name}"
@@ -859,11 +870,12 @@ def delay_startup_item(item_id, delay_minutes=2):
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         # Put the original Run entry back so we didn't just delete it for nothing.
+        log.warning("Failed to create delayed-start scheduled task %s", task_name, exc_info=True)
         try:
             with winreg.OpenKey(root, subpath, 0, winreg.KEY_ALL_ACCESS) as key:
                 winreg.SetValueEx(key, name, 0, winreg.REG_SZ, command)
         except OSError:
-            pass
+            log.error("Failed to restore Run key %s after scheduled task creation failed", name, exc_info=True)
         return False, "สร้าง Scheduled Task ไม่สำเร็จ"
 
     return True, ""
@@ -1072,6 +1084,7 @@ def shred_file(path):
         os.remove(path)
         return True
     except OSError:
+        log.warning("Failed to shred file %s", path, exc_info=True)
         return False
 
 
