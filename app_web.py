@@ -10,7 +10,6 @@ import webview
 
 from api import Api
 import backend
-from remote.host_session import HostSession, load_resume_state
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 
@@ -35,22 +34,6 @@ def main():
         background_color="#0e0e16",
     )
     api.window = window
-
-    resume = load_resume_state()
-    if resume:
-        session = HostSession(
-            label=resume["label"],
-            code=resume["code"],
-            ip=resume["ip"],
-            port=resume["port"],
-            unattended=resume.get("unattended", False),
-        )
-        api.host_session = session
-        session.start()
-    else:
-        session = HostSession.resume_unattended()
-        if session:
-            api.host_session = session
 
     webview.start()
 

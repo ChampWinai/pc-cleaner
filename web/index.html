@@ -26,7 +26,6 @@
     <button class="tab-btn" data-tab="gamemode">🎮 Game Mode</button>
     <button class="tab-btn" data-tab="privacy">🔒 ความเป็นส่วนตัว</button>
     <button class="tab-btn" data-tab="drivers">🔧 ฮาร์ดแวร์ &amp; ไดรเวอร์</button>
-    <button class="tab-btn" data-tab="remote">🖥 รีโมทช่วยเหลือ</button>
   </nav>
 
   <main class="layout tab-panel" id="tab-clean">
@@ -204,118 +203,6 @@
       <div class="panel-title">ไดรเวอร์ที่ติดตั้งอยู่ (เรียงจากเก่าสุด)</div>
       <div class="panel-sub">ไดรเวอร์เก่ามากไม่ได้แปลว่ามีปัญหาเสมอไป — ฮาร์ดแวร์บางตัวไม่จำเป็นต้องอัปเดตบ่อย</div>
       <div id="driverList" class="item-list"></div>
-    </section>
-  </main>
-
-  <!-- Remote Assistance tab -->
-  <main class="layout tab-panel hidden" id="tab-remote">
-    <section class="glass glow-hover panel-summary">
-      <div class="summary-left">
-        <div class="summary-label">🖥 Remote Assistance &amp; Diagnostic Tools</div>
-        <div class="summary-sub">เชื่อมต่อผ่านรหัสชั่วคราวแบบเข้ารหัส end-to-end — ไม่มีข้อมูลไหลผ่าน server กลาง ต้องกด "อนุญาต" ทุกครั้งก่อนเริ่ม</div>
-      </div>
-    </section>
-
-    <section class="cards-row">
-      <div class="glass glow-hover card remote-mode-card" id="cardGetHelp">
-        <div class="card-icon">🆘</div>
-        <div class="card-body">
-          <div class="card-title">ขอความช่วยเหลือ (Get Help)</div>
-          <div class="card-value muted">แชร์รหัสให้ช่างเพื่อรับความช่วยเหลือ</div>
-        </div>
-        <button class="btn btn-accent" id="btnRemoteModeHost">เลือก</button>
-      </div>
-      <div class="glass glow-hover card remote-mode-card" id="cardGiveHelp">
-        <div class="card-icon">🛠</div>
-        <div class="card-body">
-          <div class="card-title">ให้ความช่วยเหลือ (Give Help)</div>
-          <div class="card-value muted">กรอกรหัสเพื่อเชื่อมต่อไปยังเครื่องอื่น</div>
-        </div>
-        <button class="btn btn-privacy" id="btnRemoteModeController">เลือก</button>
-      </div>
-    </section>
-
-    <!-- Host (Get Help) panel -->
-    <section class="glass glow-hover panel-list hidden" id="remoteHostPanel">
-      <div class="panel-title">รหัสเชื่อมต่อของคุณ</div>
-      <div id="remoteHostIdle">
-        <div class="panel-sub">กดปุ่มด้านล่าง แล้วส่งรหัสที่ได้ให้ช่างทางไลน์/แชท (ใช้งานได้ทันทีถ้าอยู่ใน Wi-Fi/เครือข่ายเดียวกัน ไม่ต้องตั้งค่าอะไรเพิ่ม)</div>
-        <button class="btn btn-accent" id="btnRemoteHostStart" style="margin-top:10px;">เริ่มรอการเชื่อมต่อ</button>
-      </div>
-      <div id="remoteHostActive" class="hidden">
-        <div class="remote-code mono" id="remoteHostCode">--------</div>
-        <button class="btn btn-ghost" id="btnRemoteHostCopy" style="width:100%;">📋 คัดลอกรหัส</button>
-        <div class="panel-sub" id="remoteHostStatusText" style="margin-top:10px;">กำลังรอการเชื่อมต่อ...</div>
-        <div class="toggle-row">
-          <label class="switch">
-            <input type="checkbox" id="remoteHostViewOnly" />
-            <span class="slider"></span>
-          </label>
-          <span class="toggle-label">โหมดดูอย่างเดียว (View-Only) — ห้ามช่างควบคุมเมาส์/คีย์บอร์ด</span>
-        </div>
-        <div class="confirm-actions" style="justify-content:flex-start;">
-          <button class="btn btn-danger" id="btnRemoteHostStop">⛔ ตัดการเชื่อมต่อทันที</button>
-          <button class="btn btn-ghost" id="btnRemoteHostReboot">🔁 รีสตาร์ทแล้วต่อเซสชันอัตโนมัติ</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Unattended Access (explicit opt-in for admins) -->
-    <section class="glass glow-hover panel-list hidden" style="--glow-rgb: var(--purple-rgb);" id="remoteUnattendedPanel">
-      <div class="panel-title">🔑 Unattended Access (สำหรับผู้ดูแลระบบ)</div>
-      <div class="panel-sub">
-        เมื่อเปิดโหมดนี้ ผู้ดูแลระบบที่มีรหัสของเครื่องนี้จะเชื่อมต่อเข้ามาได้ทันทีโดยไม่ต้องรอกด "อนุญาต" ทุกครั้ง —
-        แต่ทุกครั้งที่มีการเชื่อมต่อ จะยังคงมี<strong>กรอบเรืองแสงและปุ่มตัดการเชื่อมต่อฉุกเฉิน</strong>ขึ้นบนหน้าจอเสมอ
-        และมีการบันทึกประวัติการเข้าใช้งานทุกครั้งไว้ให้ตรวจสอบได้ที่นี่ ปิดโหมดนี้ได้ตลอดเวลา
-      </div>
-      <div class="toggle-row">
-        <label class="switch">
-          <input type="checkbox" id="remoteUnattendedToggle" />
-          <span class="slider"></span>
-        </label>
-        <span class="toggle-label" id="remoteUnattendedLabel">ปิดอยู่</span>
-      </div>
-      <div id="remoteUnattendedInfo" class="hidden" style="margin-top:8px;">
-        <div class="remote-code mono" id="remoteUnattendedCode">--------</div>
-        <button class="btn btn-ghost" id="btnRemoteUnattendedCopy" style="width:100%;">📋 คัดลอกรหัสถาวร</button>
-      </div>
-      <div class="panel-title" style="font-size:13px;margin-top:14px;">🧾 ประวัติการเชื่อมต่อ</div>
-      <div id="remoteAuditLog" class="remote-audit-log"></div>
-    </section>
-
-    <!-- Controller (Give Help) panel -->
-    <section class="glass glow-hover panel-list panel-tall hidden" id="remoteControllerPanel">
-      <div id="remoteControllerConnect">
-        <div class="panel-title">เชื่อมต่อไปยังเครื่องอื่น</div>
-        <div class="panel-sub">วางรหัสที่ได้รับจากอีกฝั่งตรงนี้ช่องเดียว (ไม่ต้องกรอก IP หรือพอร์ตเอง)</div>
-        <input type="text" id="remoteCodeInput" class="remote-input mono" placeholder="เช่น XYB4AFFC@192.168.1.23:53214" style="margin-top:8px;" />
-        <button class="btn btn-privacy" id="btnRemoteConnect" style="margin-top:10px;">เชื่อมต่อ</button>
-        <div class="panel-sub" id="remoteControllerStatusText"></div>
-      </div>
-
-      <div id="remoteControllerActive" class="hidden">
-        <div class="remote-view-row">
-          <div class="remote-canvas-wrap">
-            <img id="remoteCanvas" class="remote-canvas" />
-            <div class="toggle-row">
-              <label class="switch">
-                <input type="checkbox" id="remoteControllerViewOnly" />
-                <span class="slider"></span>
-              </label>
-              <span class="toggle-label">View-Only (ปิดเพื่อควบคุมเมาส์/คีย์บอร์ด)</span>
-              <button class="btn btn-ghost" id="btnRemoteDisconnect" style="margin-left:auto;">⛔ ตัดการเชื่อมต่อ</button>
-            </div>
-          </div>
-          <div class="remote-side-panel">
-            <div class="panel-title" style="font-size:14px;">📊 Live Telemetry</div>
-            <div id="remoteTelemetry" class="remote-telemetry mono"></div>
-            <div class="panel-title" style="font-size:14px;margin-top:14px;">⚡ Quick Actions</div>
-            <div id="remoteActionButtons" class="remote-actions"></div>
-            <button class="btn btn-accent" id="btnRemoteDiagnostic" style="margin-top:10px;width:100%;">🩺 Generate System Health Report</button>
-            <div id="remoteDiagnosticReport" class="remote-diagnostic-report"></div>
-          </div>
-        </div>
-      </div>
     </section>
   </main>
 
