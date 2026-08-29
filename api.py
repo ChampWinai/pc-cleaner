@@ -8,16 +8,11 @@ not freeze the window chrome.
 import webview
 
 import backend
-from remote import actions as remote_actions, trust_store, audit_log
-from remote.host_session import HostSession, reboot_and_resume, get_lan_ip
-from remote.controller_session import ControllerSession
 
 
 class Api:
     def __init__(self):
         self.window = None  # set by app_web.py after the window is created
-        self.host_session = None
-        self.controller_session = None
 
     def scan(self, deep=False):
         def on_progress(label):
@@ -175,125 +170,3 @@ class Api:
     def open_windows_update(self):
         return {"success": backend.open_windows_update()}
 
-    # -- Remote Assistance ---------------------------------------------------
-    def remote_list_actions(self):
-        return remote_actions.list_actions()
-
-    def remote_host_start(self, label):
-        if self.host_session and self.host_session.get_status()["status"] not in ("ended",):
-            self.host_session.stop()
-        self.host_session = HostSession(label=label or "This PC")
-        return self.host_session.start()
-
-    def remote_host_status(self):
-        if not self.host_session:
-            return {"status": "idle"}
-        return self.host_session.get_status()
-
-    def remote_host_set_view_only(self, value):
-        if self.host_session:
-            self.host_session.set_view_only(value)
-        return {"success": True}
-
-    def remote_host_stop(self):
-        if self.host_session:
-            self.host_session.stop()
-        return {"success": True}
-
-    def remote_host_reboot_and_resume(self):
-        if not self.host_session:
-            return {"success": False}
-        reboot_and_resume(self.host_session)
-        return {"success": True}
-
-    # -- Unattended Access (explicit opt-in) ---------------------------------
-    def remote_unattended_status(self):
-        data = trust_store.load()
-        if not data or not data.get("enabled"):
-            return {"enabled": False}
-        connect_code = (
-            self.host_session.connect_code
-            if self.host_session and getattr(self.host_session, "unattended", False)
-            else f"{data['code']}@{get_lan_ip()}:{data['port']}"
-        )
-        active = bool(
-            self.host_session
-            and getattr(self.host_session, "unattended", False)
-            and self.host_session.get_status()["status"] not in ("ended",)
-        )
-        return {"enabled": True, "connect_code": connect_code, "active": active}
-
-    def remote_unattended_enable(self, label):
-        if self.host_session and self.host_session.get_status()["status"] not in ("ended",):
-            self.host_session.stop()
-        self.host_session = HostSession.enable_unattended(label=label or "This PC")
-        return {"connect_code": self.host_session.connect_code}
-
-    def remote_unattended_disable(self):
-        HostSession.disable_unattended()
-        if self.host_session and getattr(self.host_session, "unattended", False):
-            self.host_session.stop()
-        return {"success": True}
-
-    def remote_audit_log(self):
-        return audit_log.get_events(50)
-
-    def remote_controller_start(self, connect_code, label):
-        if self.controller_session and self.controller_session.get_status()["status"] != "ended":
-            self.controller_session.stop()
-        try:
-            self.controller_session = ControllerSession(connect_code=connect_code, label=label or "Technician")
-        except ValueError:
-            return {"success": False, "message": "รหัสเชื่อมต่อไม่ถูกต้อง"}
-        self.controller_session.start()
-        return {"success": True}
-
-    def remote_controller_status(self):
-        if not self.controller_session:
-            return {"status": "idle"}
-        return self.controller_session.get_status()
-
-    def remote_controller_frame(self):
-        if not self.controller_session:
-            return None
-        return self.controller_session.get_frame()
-
-    def remote_controller_telemetry(self):
-        if not self.controller_session:
-            return None
-        return self.controller_session.get_telemetry()
-
-    def remote_controller_diagnostic_report(self):
-        if not self.controller_session:
-            return None
-        return self.controller_session.pop_diagnostic_report()
-
-    def remote_controller_request_diagnostic_report(self):
-        if self.controller_session:
-            self.controller_session.request_diagnostic_report()
-        return {"success": True}
-
-    def remote_controller_action_result(self):
-        if not self.controller_session:
-            return None
-        return self.controller_session.pop_action_result()
-
-    def remote_controller_request_action(self, action_id):
-        if self.controller_session:
-            self.controller_session.request_action(action_id)
-        return {"success": True}
-
-    def remote_controller_set_view_only(self, value):
-        if self.controller_session:
-            self.controller_session.set_view_only(value)
-        return {"success": True}
-
-    def remote_controller_input(self, kind, payload):
-        if self.controller_session:
-            self.controller_session.send_input(kind, **(payload or {}))
-        return {"success": True}
-
-    def remote_controller_stop(self):
-        if self.controller_session:
-            self.controller_session.stop()
-        return {"success": True}
