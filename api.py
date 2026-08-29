@@ -6,13 +6,28 @@ not freeze the window chrome.
 """
 
 import webview
+import logging
 
 import backend
+from config_manager import config
+from history_db import history_db
+from update_checker import UpdateChecker
+from task_scheduler import TaskSchedulerManager
+from operation_context import OperationContext
+
+log = logging.getLogger(__name__)
+
+# Track active operations for cancellation
+_active_operations = {}
 
 
 class Api:
     def __init__(self):
         self.window = None  # set by app_web.py after the window is created
+
+    # ========================================================================
+    # SCANNING & CLEANING
+    # ========================================================================
 
     def scan(self, deep=False):
         def on_progress(label):
@@ -48,6 +63,10 @@ class Api:
     def empty_recycle_bin(self):
         return {"success": backend.empty_recycle_bin()}
 
+    # ========================================================================
+    # VAULT (RECYCLE BIN)
+    # ========================================================================
+
     def vault_list(self):
         entries = backend.vault_list()
         for e in entries:
@@ -69,14 +88,20 @@ class Api:
     def human_size(self, num_bytes):
         return backend.human_size(num_bytes)
 
-    # -- Docker ----------------------------------------------------------
+    # ========================================================================
+    # DOCKER
+    # ========================================================================
+
     def docker_available(self):
         return backend.docker_available()
 
     def docker_prune(self):
         return backend.docker_prune()
 
-    # -- App Uninstaller ---------------------------------------------------
+    # ========================================================================
+    # APP UNINSTALLER
+    # ========================================================================
+
     def list_apps(self):
         apps = backend.list_installed_apps()
         for a in apps:
@@ -86,7 +111,10 @@ class Api:
     def uninstall_app(self, uninstall_string):
         return {"success": backend.uninstall_app(uninstall_string)}
 
-    # -- Startup Manager ---------------------------------------------------
+    # ========================================================================
+    # STARTUP MANAGER
+    # ========================================================================
+
     def list_startup(self):
         return backend.list_startup_items()
 
@@ -105,7 +133,10 @@ class Api:
     def undo_delay_startup(self, task_name):
         return {"success": backend.undo_delay_startup_item(task_name)}
 
-    # -- Game Mode ---------------------------------------------------------
+    # ========================================================================
+    # GAME MODE
+    # ========================================================================
+
     def list_freezable_processes(self):
         items = backend.list_freezable_processes()
         for it in items:
@@ -123,7 +154,10 @@ class Api:
         resumed, total = backend.disable_game_mode()
         return {"resumed": resumed, "total": total}
 
-    # -- Sensitive Data Scanner ---------------------------------------------
+    # ========================================================================
+    # SENSITIVE DATA SCANNER
+    # ========================================================================
+
     def pick_folder(self):
         if not self.window:
             return None
@@ -141,7 +175,10 @@ class Api:
         entry = backend.move_to_vault(path, f"privacy_{backend.uuid.uuid4().hex[:6]}", label)
         return {"success": True, "id": entry["id"]}
 
-    # -- Auto Clean (hourly Scheduled Task) ---------------------------------
+    # ========================================================================
+    # AUTO CLEAN (SCHEDULED TASK)
+    # ========================================================================
+
     def auto_clean_status(self):
         status = backend.auto_clean_status()
         if status.get("last_run"):
@@ -160,7 +197,10 @@ class Api:
         entry["ran_at_date"] = entry["ran_at"].split("T")[0]
         return entry
 
-    # -- Hardware & Driver update check ------------------------------------
+    # ========================================================================
+    # HARDWARE & DRIVERS
+    # ========================================================================
+
     def list_drivers(self):
         return backend.list_drivers()
 
@@ -169,4 +209,131 @@ class Api:
 
     def open_windows_update(self):
         return {"success": backend.open_windows_update()}
+
+    # ========================================================================
+    # CONFIGURATION MANAGEMENT
+    # ========================================================================
+
+    def get_config(self, key, default=None):
+        """Get config value by dot-notation path."""
+        try:
+            return config.get(key, default)
+        except Exception as e:
+            log.error(f"Failed to get config '{key}': {e}")
+            return default
+
+    def set_config(self, key, value):
+        """Set config value by dot-notation path."""
+        try:
+            return config.set(key, value)
+        except Exception as e:
+            log.error(f"Failed to set config '{key}': {e}")
+            return False
+
+    def get_all_config(self):
+        """Get entire config dict."""
+        return config.config
+
+    def reset_config(self):
+        """Reset all settings to defaults."""
+        return config.reset_to_defaults()
+
+    def get_whitelist(self):
+        """Get list of whitelisted folders."""
+        return config.get_whitelist_folders()
+
+    def add_whitelist(self, folder):
+        """Add folder to whitelist."""
+        return config.add_whitelist_folder(folder)
+
+    def remove_whitelist(self, folder):
+        """Remove folder from whitelist."""
+        return config.remove_whitelist_folder(folder)
+
+    # ========================================================================
+    # HISTORY & ANALYTICS
+    # ========================================================================
+
+    def get_history_stats(self):
+        """Get aggregate statistics."""
+        return history_db.get_stats()
+
+    def get_recent_scans(self, limit=50):
+        """Get recent scan history."""
+        return history_db.get_recent_scans(limit)
+
+    def get_scan_items(self, scan_id):
+        """Get items cleaned in a specific scan."""
+        return history_db.get_cleaned_items_by_scan(scan_id)
+
+    def clear_old_history(self, days=30):
+        """Clear history older than specified days."""
+        deleted = history_db.clear_old_history(days)
+        return {"deleted": deleted}
+
+    # ========================================================================
+    # UPDATE CHECKING
+    # ========================================================================
+
+    def check_for_updates(self):
+        """Check for new version."""
+        update_info = UpdateChecker.check_and_notify()
+        if update_info:
+            return {
+                "available": True,
+                "version": update_info.get('version'),
+                "url": update_info.get('url'),
+                "download_url": update_info.get('download_url'),
+                "release_notes": update_info.get('release_notes'),
+            }
+        return {"available": False}
+
+    # ========================================================================
+    # AUTO-CLEAN SCHEDULING (TASK SCHEDULER)
+    # ========================================================================
+
+    def schedule_auto_clean(self, hour, minute, frequency):
+        """Create scheduled auto-clean task."""
+        success = TaskSchedulerManager.create_task(hour, minute, frequency)
+        return {"success": success}
+
+    def unschedule_auto_clean(self):
+        """Remove scheduled auto-clean task."""
+        success = TaskSchedulerManager.delete_task()
+        return {"success": success}
+
+    def get_auto_clean_schedule(self):
+        """Check if auto-clean is scheduled."""
+        status = TaskSchedulerManager.get_task_status()
+        return status
+
+    # ========================================================================
+    # OPERATION CONTROL (CANCELLATION & PROGRESS)
+    # ========================================================================
+
+    def create_operation(self, operation_id):
+        """Create a new operation context."""
+        if operation_id not in _active_operations:
+            _active_operations[operation_id] = OperationContext(operation_id)
+        return {"operation_id": operation_id}
+
+    def cancel_operation(self, operation_id):
+        """Cancel an active operation."""
+        if operation_id in _active_operations:
+            _active_operations[operation_id].cancel()
+            return {"success": True}
+        return {"success": False}
+
+    def get_operation_progress(self, operation_id):
+        """Get progress of an active operation."""
+        if operation_id in _active_operations:
+            return _active_operations[operation_id].get_progress()
+        return {"progress": 0, "total": 0, "percentage": 0}
+
+    def cleanup_operation(self, operation_id):
+        """Clean up an operation context."""
+        if operation_id in _active_operations:
+            del _active_operations[operation_id]
+            return {"success": True}
+        return {"success": False}
 

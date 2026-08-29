@@ -13,6 +13,8 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+import traceback
 import uuid
 import winreg
 from datetime import datetime, timedelta
@@ -22,8 +24,16 @@ import pythoncom
 import win32com.client
 
 from logging_setup import get_logger
+from config_manager import config
+from history_db import history_db
+from update_checker import UpdateChecker
+from operation_context import OperationContext, OperationCancelled, retry, RetryConfig
+from plugin_system import plugin_manager
 
 log = get_logger(__name__)
+
+# Default retry config for I/O operations
+IO_RETRY_CONFIG = RetryConfig(max_attempts=3, initial_delay=0.5, max_delay=5)
 
 
 def human_size(num_bytes):

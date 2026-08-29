@@ -1,14 +1,195 @@
 ﻿"use strict";
 
 const state = {
-  items: [],       // {label, path, size, risk, note, checked} โ€” top-level scan targets
+  items: [],       // {label, path, size, risk, note, checked} — top-level scan targets
   ramTimer: null,
   crumbs: [],      // [{label, nodes}] drill-down breadcrumb trail for the treemap
+  darkMode: localStorage.getItem('darkMode') === 'true' || window.matchMedia('(prefers-color-scheme: dark)').matches,
+  currentOperation: null,
+  operationProgress: { progress: 0, total: 0, percentage: 0 },
 };
 
 const RISK_COLOR = { safe: "#30D158", low: "#FF9F0A", medium: "#FF6B35", high: "#FF453A" };
 
 const $ = (id) => document.getElementById(id);
+
+// =========================================================================
+// THEME MANAGEMENT (DARK MODE / LIGHT MODE)
+// =========================================================================
+function initTheme() {
+  const root = document.documentElement;
+  if (state.darkMode) {
+    root.setAttribute('data-theme', 'dark');
+    document.body.classList.add('dark-mode');
+  } else {
+    root.setAttribute('data-theme', 'light');
+    document.body.classList.remove('dark-mode');
+  }
+}
+
+function toggleTheme() {
+  state.darkMode = !state.darkMode;
+  localStorage.setItem('darkMode', state.darkMode);
+  initTheme();
+  
+  // Send to backend
+  if (api && api.set_config) {
+    api.set_config('ui.dark_mode', state.darkMode).catch(() => {});
+  }
+}
+
+async function syncThemeFromConfig() {
+  if (api && api.get_config) {
+    const darkMode = await api.get_config('ui.dark_mode', state.darkMode);
+    state.darkMode = darkMode;
+    initTheme();
+  }
+}
+
+// =========================================================================
+// OPERATION PROGRESS TRACKING
+// =========================================================================
+function createOperationId() {
+  return 'op_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+}
+
+async function startOperationTracking(operationName) {
+  state.currentOperation = createOperationId();
+  if (api && api.create_operation) {
+    await api.create_operation(state.currentOperation).catch(() => {});
+  }
+  return state.currentOperation;
+}
+
+async function cancelOperation() {
+  if (state.currentOperation && api && api.cancel_operation) {
+    await api.cancel_operation(state.currentOperation).catch(() => {});
+  }
+}
+
+async function updateOperationProgress() {
+  if (!state.currentOperation || !api || !api.get_operation_progress) return;
+  
+  try {
+    const progress = await api.get_operation_progress(state.currentOperation);
+    state.operationProgress = progress;
+    
+    // Update UI progress bars if they exist
+    const progressBar = $('operation-progress-bar');
+    if (progressBar) {
+      progressBar.style.width = progress.percentage + '%';
+    }
+    
+    const progressPercent = $('operation-progress-percent');
+    if (progressPercent) {
+      progressPercent.textContent = progress.percentage + '%';
+    }
+  } catch (e) {
+    // Silent fail
+  }
+}
+
+async function stopOperationTracking() {
+  if (state.currentOperation && api && api.cleanup_operation) {
+    await api.cleanup_operation(state.currentOperation).catch(() => {});
+  }
+  state.currentOperation = null;
+  state.operationProgress = { progress: 0, total: 0, percentage: 0 };
+}
+
+// =========================================================================
+// CONFIGURATION MANAGEMENT UI
+// =========================================================================
+async function loadSettings() {
+  if (!api || !api.get_all_config) return;
+  
+  try {
+    const config = await api.get_all_config();
+    
+    // Update UI elements based on config
+    const darkModeToggle = $('theme-dark-toggle');
+    if (darkModeToggle) {
+      darkModeToggle.checked = config.ui?.dark_mode || false;
+    }
+    
+    const autoCleanToggle = $('auto-clean-toggle');
+    if (autoCleanToggle) {
+      autoCleanToggle.checked = config.cleaning?.auto_clean_enabled || false;
+    }
+    
+    const enableLoggingToggle = $('enable-logging-toggle');
+    if (enableLoggingToggle) {
+      enableLoggingToggle.checked = config.general?.enable_logging !== false;
+    }
+  } catch (e) {
+    console.error('Failed to load settings:', e);
+  }
+}
+
+async function saveSettings() {
+  if (!api || !api.set_config) return;
+  
+  try {
+    const darkModeToggle = $('theme-dark-toggle');
+    if (darkModeToggle) {
+      await api.set_config('ui.dark_mode', darkModeToggle.checked);
+    }
+    
+    const autoCleanToggle = $('auto-clean-toggle');
+    if (autoCleanToggle) {
+      await api.set_config('cleaning.auto_clean_enabled', autoCleanToggle.checked);
+    }
+  } catch (e) {
+    console.error('Failed to save settings:', e);
+  }
+}
+
+// =========================================================================
+// CHECK FOR UPDATES
+// =========================================================================
+async function checkForUpdates() {
+  if (!api || !api.check_for_updates) return;
+  
+  try {
+    const result = await api.check_for_updates();
+    if (result.available) {
+      toast(`🎉 New version available: ${result.version}. <a href="${result.url}" target="_blank">Download</a>`, 'info', 5000);
+    }
+  } catch (e) {
+    console.error('Update check failed:', e);
+  }
+}
+
+// =========================================================================
+// HISTORY & ANALYTICS
+// =========================================================================
+async function loadHistoryStats() {
+  if (!api || !api.get_history_stats) return;
+  
+  try {
+    const stats = await api.get_history_stats();
+    
+    const statsElement = $('history-stats');
+    if (statsElement) {
+      statsElement.innerHTML = `
+        <div>📊 Total Scans: <strong>${stats.total_scans || 0}</strong></div>
+        <div>🗑️ Total Cleaned: <strong>${humanSize(stats.total_cleaned_bytes || 0)}</strong></div>
+        <div>⚠️ Errors: <strong>${stats.total_errors || 0}</strong></div>
+        <div>♻️ Vault Restores: <strong>${stats.total_vault_restores || 0}</strong></div>
+      `;
+    }
+  } catch (e) {
+    console.error('Failed to load history stats:', e);
+  }
+}
+
+// Initialize theme on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initTheme);
+} else {
+  initTheme();
+}
+
 
 // ---------------------------------------------------------------------
 // Toasts (non-intrusive corner notifications instead of blocking dialogs)
