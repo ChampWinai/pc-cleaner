@@ -174,7 +174,6 @@ def _expand_shader_cloud_targets(env):
     cleaners because they live in vendor-specific, easy-to-miss paths.
     """
     local = env.get("LOCALAPPDATA", "")
-    appdata = env.get("APPDATA", "")
     userprofile = env.get("USERPROFILE", "")
 
     fixed = [
