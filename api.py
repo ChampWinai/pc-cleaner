@@ -554,3 +554,24 @@ class Api:
 
     def remove_context_menu(self):
         return {"success": backend.remove_context_menu()}
+
+    # -- New Advanced Tools --------------------------------------------------
+    def debloat_windows(self):
+        import windows_optimizer
+        return windows_optimizer.remove_bloatware()
+
+    def disable_telemetry(self):
+        import windows_optimizer
+        return windows_optimizer.disable_telemetry()
+
+    def clean_registry(self):
+        import windows_optimizer
+        return windows_optimizer.clean_registry()
+
+    def find_duplicate_files(self, folder, mode="hash", extensions=None):
+        import advanced_features
+        finder = advanced_features.DuplicateFinderAdvanced()
+        if mode == "name":
+            return finder.find_by_name(folder)
+        else:
+            return finder.find_by_hash(folder, extensions)

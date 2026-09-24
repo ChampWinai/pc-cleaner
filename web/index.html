@@ -26,6 +26,7 @@
     <button class="tab-btn" data-tab="gamemode">🎮 Game Mode</button>
     <button class="tab-btn" data-tab="privacy">🔒 ความเป็นส่วนตัว</button>
     <button class="tab-btn" data-tab="drivers">🔧 ฮาร์ดแวร์ &amp; ไดรเวอร์</button>
+      <button class="tab-btn" data-tab="advanced">🛠️ เครื่องมือขั้นสูง</button>
   </nav>
 
   <main class="layout tab-panel" id="tab-clean">
@@ -243,5 +244,57 @@
   </div>
 
   <script src="app.js"></script>
+
+  <main class="layout tab-panel" id="tab-advanced" style="display: none;">
+    <div class="glass panel-header">
+      <div class="panel-title">เครื่องมือขั้นสูง (Advanced Tools)</div>
+      <div class="panel-desc">ปรับแต่ง Windows และจัดการไฟล์ซ้ำ</div>
+    </div>
+    <div class="list-view" id="advanced-tools-list">
+      <div class="glass list-item">
+        <div class="app-info">
+          <div class="app-name">Windows Debloat</div>
+          <div class="app-publisher">ลบแอปขยะที่มาพร้อมกับ Windows (เช่น Xbox, Candy Crush)</div>
+        </div>
+        <button class="btn btn-danger" onclick="window.pywebview.api.debloat_windows().then(res => alert('ทำความสะอาดสำเร็จ!'))">เริ่มทำความสะอาด</button>
+      </div>
+      <div class="glass list-item">
+        <div class="app-info">
+          <div class="app-name">บล็อก Telemetry (ความเป็นส่วนตัว)</div>
+          <div class="app-publisher">ปิดการส่งข้อมูลการใช้งานกลับไปยัง Microsoft</div>
+        </div>
+        <button class="btn btn-warning" onclick="window.pywebview.api.disable_telemetry().then(res => alert('ปิด Telemetry สำเร็จ!'))">ปิด Telemetry</button>
+      </div>
+      <div class="glass list-item">
+        <div class="app-info">
+          <div class="app-name">ปรับปรุง Registry</div>
+          <div class="app-publisher">เคลียร์แคชและค่าที่ตกค้างในระบบอย่างปลอดภัย</div>
+        </div>
+        <button class="btn btn-accent" onclick="window.pywebview.api.clean_registry().then(res => alert('จัดการ Registry สำเร็จ!'))">ปรับปรุงตอนนี้</button>
+      </div>
+      <div class="glass list-item">
+        <div class="app-info">
+          <div class="app-name">ค้นหาไฟล์ซ้ำ (Duplicate Finder)</div>
+          <div class="app-publisher">ค้นหาไฟล์ที่ซ้ำกันเพื่อประหยัดพื้นที่</div>
+        </div>
+        <button class="btn btn-accent" onclick="window.pywebview.api.find_duplicate_files('C:/').then(res => alert('พบไฟล์ซ้ำ: ' + res.total_groups + ' กลุ่ม'))">เริ่มค้นหา</button>
+      </div>
+      <div class="glass list-item">
+        <div class="app-info">
+          <div class="app-name">ล้างเครือข่าย (Network Flush)</div>
+          <div class="app-publisher">รีเซ็ต DNS และ Winsock เพื่อแก้ปัญหาเน็ตหลุด</div>
+        </div>
+        <button class="btn btn-accent" onclick="window.pywebview.api.network_flush().then(res => alert('ล้างเครือข่ายสำเร็จ!'))">ล้างแคชเน็ต</button>
+      </div>
+      <div class="glass list-item">
+        <div class="app-info">
+          <div class="app-name">อัปเดตโปรแกรม (Winget)</div>
+          <div class="app-publisher">เช็คและอัปเดตโปรแกรมในเครื่องทั้งหมดรวดเดียว</div>
+        </div>
+        <button class="btn btn-accent" onclick="window.pywebview.api.update_software_winget().then(res => alert('อัปเดตซอฟต์แวร์เสร็จสิ้น!'))">อัปเดตทั้งหมด</button>
+      </div>
+    </div>
+  </main>
+
 </body>
 </html>
