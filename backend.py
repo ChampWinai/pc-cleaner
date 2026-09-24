@@ -529,19 +529,43 @@ def clean_items(selected):
     freed = 0
     new_entries = []
     batch_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-    for it in selected:
-        path = it["path"]
-        if not os.path.isdir(path):
-            continue
-        for entry in os.listdir(path):
-            full = os.path.join(path, entry)
+    
+    MOVEFILE_DELAY_UNTIL_REBOOT = 0x4
+    kernel32 = ctypes.windll.kernel32
+
+    def _process_file(full_path, label):
+        try:
+            return _move_to_vault_no_index(full_path, batch_id, label), None
+        except PermissionError:
+            # Schedule for deletion on reboot if locked
+            success = kernel32.MoveFileExW(full_path, None, MOVEFILE_DELAY_UNTIL_REBOOT)
+            if success:
+                return None, f"Scheduled for deletion on reboot: {full_path}"
+            return None, f"Locked and cannot be scheduled: {full_path}"
+        except OSError as e:
+            return None, f"{full_path}: {e}"
+
+    tasks = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        for it in selected:
+            path = it["path"]
+            if not os.path.isdir(path):
+                continue
             try:
-                vault_entry = _move_to_vault_no_index(full, batch_id, it["label"])
+                for entry in os.listdir(path):
+                    full = os.path.join(path, entry)
+                    tasks.append(executor.submit(_process_file, full, it["label"]))
+            except OSError:
+                continue
+
+        for future in concurrent.futures.as_completed(tasks):
+            vault_entry, err = future.result()
+            if vault_entry:
                 new_entries.append(vault_entry)
                 freed += vault_entry["size"]
-            except OSError as e:
-                log.warning("Failed to vault %s: %s", full, e)
-                errors.append(f"{full}: {e}")
+            if err:
+                log.warning(err)
+                errors.append(err)
 
     if new_entries:
         entries = _load_vault_index()
@@ -1309,3 +1333,85 @@ def auto_clean_disable():
     settings["enabled"] = False
     _save_json(AUTO_CLEAN_SETTINGS_PATH, settings)
     return True
+
+# ---------------------------------------------------------------------------
+# Network Flush - Clear DNS and winsock
+# ---------------------------------------------------------------------------
+def network_flush():
+    results = []
+    commands = [
+        ("ipconfig /flushdns", "Flush DNS"),
+        ("ipconfig /release", "Release IP"),
+        ("ipconfig /renew", "Renew IP"),
+        ("netsh winsock reset", "Winsock Reset")
+    ]
+    for cmd, name in commands:
+        try:
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+            results.append({"name": name, "success": res.returncode == 0, "output": res.stdout.strip()[:100]})
+        except Exception as e:
+            results.append({"name": name, "success": False, "output": str(e)})
+    return results
+
+# ---------------------------------------------------------------------------
+# Winget - Software Updater
+# ---------------------------------------------------------------------------
+def update_software_winget():
+    try:
+        res = subprocess.run(["winget", "upgrade", "--all", "--silent", "--accept-package-agreements", "--accept-source-agreements"], 
+                             capture_output=True, text=True, timeout=300)
+        return {"success": res.returncode == 0, "output": res.stdout.strip()[-500:]}
+    except Exception as e:
+        return {"success": False, "output": str(e)}
+
+# ---------------------------------------------------------------------------
+# Disk Analyzer (Large Files)
+# ---------------------------------------------------------------------------
+def scan_large_files(drive="C:\\", limit=50, min_size_mb=100):
+    large_files = []
+    min_bytes = min_size_mb * 1024 * 1024
+    start_time = datetime.now()
+    try:
+        for root, dirs, files in os.walk(drive):
+            if (datetime.now() - start_time).seconds > 15:
+                break
+            for name in files:
+                full = os.path.join(root, name)
+                try:
+                    size = os.path.getsize(full)
+                    if size >= min_bytes:
+                        large_files.append({"path": full, "size": size})
+                except OSError:
+                    continue
+    except Exception:
+        pass
+        
+    large_files.sort(key=lambda x: x["size"], reverse=True)
+    return large_files[:limit]
+
+# ---------------------------------------------------------------------------
+# Context Menu Integration
+# ---------------------------------------------------------------------------
+def add_context_menu():
+    try:
+        key_path = r"Directory\shell\PCCleaner"
+        with winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, key_path) as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, "Clean with PC Cleaner")
+            winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, f'"{sys.executable}",0')
+        
+        command_path = rf"{key_path}\command"
+        with winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, command_path) as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, f'"{sys.executable}" "%1"')
+        return True
+    except PermissionError:
+        return False
+
+def remove_context_menu():
+    try:
+        winreg.DeleteKey(winreg.HKEY_CLASSES_ROOT, r"Directory\shell\PCCleaner\command")
+        winreg.DeleteKey(winreg.HKEY_CLASSES_ROOT, r"Directory\shell\PCCleaner")
+        return True
+    except FileNotFoundError:
+        return True
+    except PermissionError:
+        return False

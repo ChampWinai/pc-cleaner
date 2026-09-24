@@ -531,3 +531,26 @@ class Api:
             return {"success": True}
         return {"success": False}
 
+    def remote_controller_stop(self):
+        if self.controller_session:
+            self.controller_session.stop()
+        return {"success": True}
+
+    # -- New Upgrades --------------------------------------------------------
+    def network_flush(self):
+        return backend.network_flush()
+
+    def update_software_winget(self):
+        return backend.update_software_winget()
+
+    def scan_large_files(self, drive="C:\\", limit=50, min_size_mb=100):
+        files = backend.scan_large_files(drive=drive, limit=limit, min_size_mb=min_size_mb)
+        for f in files:
+            f["size_human"] = backend.human_size(f["size"])
+        return files
+
+    def add_context_menu(self):
+        return {"success": backend.add_context_menu()}
+
+    def remove_context_menu(self):
+        return {"success": backend.remove_context_menu()}
