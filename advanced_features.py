@@ -1,4 +1,5 @@
 """Advanced features: benchmarking, cost analysis, keyboard shortcuts."""
+import concurrent.futures
 import logging
 import time
 from typing import Dict, Optional, Tuple, List
@@ -210,27 +211,28 @@ class DuplicateFinderAdvanced:
             hash_map = {}
             duplicates = {}
 
+            # Group by size first: a file with a unique size can't have a
+            # duplicate, so it never needs to be read. This skips most I/O.
+            by_size = {}
             for root, dirs, files in os.walk(folder):
                 for file in files:
-                    # Filter by extension if specified
-                    if extensions:
-                        if not any(file.lower().endswith(ext) for ext in extensions):
-                            continue
-
+                    if extensions and not any(file.lower().endswith(ext) for ext in extensions):
+                        continue
                     filepath = os.path.join(root, file)
                     try:
-                        # Calculate file hash
-                        file_hash = self._hash_file(filepath)
-                        if file_hash:
-                            if file_hash not in hash_map:
-                                hash_map[file_hash] = []
-                            hash_map[file_hash].append({
-                                'path': filepath,
-                                'size': os.path.getsize(filepath),
-                                'name': file,
-                            })
-                    except Exception as e:
-                        log.debug(f"Failed to hash {filepath}: {e}")
+                        size = os.path.getsize(filepath)
+                    except OSError:
+                        continue
+                    if size > 0:
+                        by_size.setdefault(size, []).append((filepath, file))
+
+            candidates = [(p, n, s) for s, grp in by_size.items() if len(grp) > 1 for p, n in grp]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+                hashes = list(ex.map(lambda c: self._hash_file(c[0]), candidates))
+            for (filepath, file, size), file_hash in zip(candidates, hashes):
+                if file_hash:
+                    hash_map.setdefault(file_hash, []).append(
+                        {'path': filepath, 'size': size, 'name': file})
 
             # Find duplicates (hash with >1 file)
             for file_hash, files in hash_map.items():

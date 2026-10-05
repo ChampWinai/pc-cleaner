@@ -5,6 +5,7 @@ Run with: python app_web.py
 
 import os
 import sys
+import threading
 
 import webview
 
@@ -22,7 +23,8 @@ def main():
         backend.run_auto_clean(deep="--deep" in sys.argv)
         return
 
-    backend.purge_expired_vault_entries()
+    # Purging a big expired vault can take minutes; don't block the window on it.
+    threading.Thread(target=backend.purge_expired_vault_entries, daemon=True).start()
     api = Api()
     window = webview.create_window(
         "PC Cleaner",

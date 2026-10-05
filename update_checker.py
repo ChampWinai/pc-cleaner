@@ -8,7 +8,7 @@ import os
 
 log = logging.getLogger(__name__)
 
-CURRENT_VERSION = "1.1.0"  # Sync this with installer.iss line 6
+CURRENT_VERSION = "1.1.1"  # Sync this with installer.iss line 6
 GITHUB_REPO = "ChampWinai/pc-cleaner"
 UPDATE_CHECK_FILE = Path(os.getenv('LOCALAPPDATA')) / 'PCCleaner' / '.last_update_check'
 

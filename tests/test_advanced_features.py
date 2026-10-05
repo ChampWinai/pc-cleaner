@@ -298,3 +298,18 @@ def test_gdpr_mode_anonymize():
     assert anonymized['user'] == '***REDACTED***'
     assert anonymized['email'] == '***REDACTED***'
     assert anonymized['action'] == 'clean'
+
+
+def test_duplicate_finder_hashes_only_same_size_files(tmp_path, monkeypatch):
+    import advanced_features as af
+    (tmp_path / "a.txt").write_text("same")
+    (tmp_path / "b.txt").write_text("same")
+    (tmp_path / "unique.txt").write_text("different length")
+    (tmp_path / "empty.txt").write_text("")
+    hashed = []
+    real = af.DuplicateFinderAdvanced._hash_file
+    monkeypatch.setattr(af.DuplicateFinderAdvanced, "_hash_file",
+                        staticmethod(lambda p, *a: (hashed.append(os.path.basename(p)), real(p))[1]))
+    res = af.DuplicateFinderAdvanced().find_by_hash(str(tmp_path))
+    assert res["total_groups"] == 1 and res["total_files"] == 2
+    assert sorted(hashed) == ["a.txt", "b.txt"]
