@@ -7,11 +7,12 @@ not freeze the window chrome.
 
 import webview
 import logging
+import threading
 
 import backend
 from config_manager import config
 from history_db import history_db
-from update_checker import UpdateChecker
+from update_checker import UpdateChecker, CURRENT_VERSION
 from task_scheduler import TaskSchedulerManager
 from operation_context import OperationContext
 from i18n import i18n, _
@@ -29,6 +30,9 @@ _active_operations = {}
 class Api:
     def __init__(self):
         self.window = None  # set by app_web.py after the window is created
+        self._update_info = None
+        self._update_path = None
+        self._update_state = {"state": "idle", "percent": 0, "message": ""}
 
     # ========================================================================
     # INTERNATIONALIZATION
@@ -467,18 +471,53 @@ class Api:
     # UPDATE CHECKING
     # ========================================================================
 
-    def check_for_updates(self):
-        """Check for new version."""
-        update_info = UpdateChecker.check_and_notify()
-        if update_info:
-            return {
-                "available": True,
-                "version": update_info.get('version'),
-                "url": update_info.get('url'),
-                "download_url": update_info.get('download_url'),
-                "release_notes": update_info.get('release_notes'),
-            }
-        return {"available": False}
+    def check_for_updates(self, force=False):
+        """Check for a new version (throttled to every 6h unless force)."""
+        info = UpdateChecker.get_update_info() if force else UpdateChecker.check_and_notify()
+        if not info:
+            return {"available": False, "current": CURRENT_VERSION}
+        self._update_info = info
+        return {
+            "available": True,
+            "current": CURRENT_VERSION,
+            "version": info['version'],
+            "url": info['url'],
+            "release_notes": info['release_notes'],
+            "size": info['size'],
+            "can_install": bool(info['sha256'] and info['download_url']),
+        }
+
+    def start_update(self):
+        """Download + verify in a background thread; poll update_state()."""
+        info = self._update_info
+        if not info:
+            return {"success": False, "message": "no update checked"}
+        if self._update_state["state"] == "downloading":
+            return {"success": True}
+        self._update_state = {"state": "downloading", "percent": 0, "message": ""}
+
+        def work():
+            try:
+                self._update_path = UpdateChecker.download_installer(
+                    info, lambda f: self._update_state.update(percent=int(f * 100)))
+                self._update_state = {"state": "ready", "percent": 100, "message": ""}
+            except Exception as e:
+                log.warning("update download failed: %s", e)
+                self._update_state = {"state": "error", "percent": 0, "message": str(e)}
+        threading.Thread(target=work, daemon=True).start()
+        return {"success": True}
+
+    def update_state(self):
+        return self._update_state
+
+    def install_update(self):
+        """Run the verified installer, then close this window so files unlock."""
+        if self._update_state["state"] != "ready":
+            return {"success": False}
+        UpdateChecker.run_installer(self._update_path)
+        if self.window:
+            self.window.destroy()
+        return {"success": True}
 
     # ========================================================================
     # AUTO-CLEAN SCHEDULING (TASK SCHEDULER)

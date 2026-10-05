@@ -147,17 +147,44 @@ async function saveSettings() {
 // =========================================================================
 // CHECK FOR UPDATES
 // =========================================================================
-async function checkForUpdates() {
+async function checkForUpdates(manual = false) {
   if (!api || !api.check_for_updates) return;
-  
   try {
-    const result = await api.check_for_updates();
-    if (result.available) {
-      toast(`🎉 New version available: ${result.version}. <a href="${result.url}" target="_blank">Download</a>`, 'info', 5000);
+    const r = await api.check_for_updates(manual);
+    $("appVersion").textContent = (r.current || "").replace(/^v/, "");
+    if (!r.available) {
+      if (manual) toast("คุณใช้เวอร์ชันล่าสุดแล้ว", "success");
+      return;
     }
+    $("updateVersion").textContent = r.version;
+    $("updateBanner").classList.remove("hidden");
+    $("btnUpdateNow").disabled = !r.can_install;
+    if (!r.can_install) $("updateSub").textContent = "ติดตั้งอัตโนมัติไม่ได้ — กดดูในหน้า Release";
   } catch (e) {
-    console.error('Update check failed:', e);
+    console.error("Update check failed:", e);
   }
+}
+
+async function startUpdate() {
+  const btn = $("btnUpdateNow");
+  btn.disabled = true;
+  $("updateBanner").classList.add("busy");
+  await api.start_update();
+  const timer = setInterval(async () => {
+    const s = await api.update_state();
+    $("updateBarFill").style.width = s.percent + "%";
+    $("updateSub").textContent = s.state === "downloading" ? `กำลังดาวน์โหลด ${s.percent}%` : $("updateSub").textContent;
+    if (s.state === "ready") {
+      clearInterval(timer);
+      $("updateSub").textContent = "ตรวจสอบไฟล์แล้ว กำลังติดตั้ง...";
+      await api.install_update();
+    } else if (s.state === "error") {
+      clearInterval(timer);
+      $("updateBanner").classList.remove("busy");
+      $("updateSub").textContent = `อัปเดตไม่สำเร็จ: ${s.message}`;
+      btn.disabled = false;
+    }
+  }, 400);
 }
 
 // =========================================================================
@@ -1008,6 +1035,9 @@ function init() {
   $("btnCheckDrivers").addEventListener("click", checkDriverUpdates);
   $("btnOpenWU").addEventListener("click", openWindowsUpdate);
   $("deepToggle").addEventListener("change", scan);
+  $("btnUpdateNow").addEventListener("click", startUpdate);
+  $("btnUpdateLater").addEventListener("click", () => $("updateBanner").classList.add("hidden"));
+  $("btnCheckUpdate").addEventListener("click", () => checkForUpdates(true));
   $("autoCleanToggle").addEventListener("change", toggleAutoClean);
   $("autoCleanInterval").addEventListener("change", changeAutoCleanInterval);
   window.addEventListener("resize", renderTreemap);
@@ -1020,6 +1050,7 @@ function init() {
   refreshVaultCount();
   initDocker();
   refreshAutoCleanStatus();
+  checkForUpdates();
   state.ramTimer = setInterval(refreshRam, 5000);
 }
 

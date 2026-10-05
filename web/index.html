@@ -16,8 +16,18 @@
       <span class="brand-mark">✦</span>
       <span class="brand-name">PC Cleaner</span>
     </div>
-    <div class="topbar-status" id="statusText">กำลังสแกน...</div>
+    <div class="topbar-status"><span id="statusText">กำลังสแกน...</span> <button class="ver-chip mono" id="btnCheckUpdate" title="ตรวจอัปเดต">v<span id="appVersion">-</span></button></div>
   </header>
+
+  <div id="updateBanner" class="update-banner hidden">
+    <div class="update-info">
+      <div class="update-title">มีเวอร์ชันใหม่ <span id="updateVersion" class="mono"></span></div>
+      <div class="update-sub" id="updateSub">พร้อมอัปเดตอัตโนมัติ — โปรแกรมจะรีสตาร์ทเอง</div>
+      <div class="update-bar"><div id="updateBarFill" class="update-bar-fill"></div></div>
+    </div>
+    <button class="btn btn-ghost" id="btnUpdateLater">ภายหลัง</button>
+    <button class="btn btn-accent" id="btnUpdateNow">อัปเดตเลย</button>
+  </div>
 
   <nav class="tabbar">
     <button class="tab-btn active" data-tab="clean">🧹 ล้างไฟล์ขยะ</button>
@@ -39,6 +49,7 @@
       </div>
       <div class="summary-right">
         <svg viewBox="0 0 120 120" class="ring">
+          <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6c8cff"/><stop offset="1" stop-color="#b58cff"/></linearGradient></defs>
           <circle cx="60" cy="60" r="52" class="ring-track" />
           <circle cx="60" cy="60" r="52" class="ring-fill" id="ringFill" />
         </svg>
