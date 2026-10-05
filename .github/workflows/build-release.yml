@@ -36,6 +36,9 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Run tests
+        run: python -m pytest tests -q
+
       - name: Build executable with PyInstaller
         run: pyinstaller PCCleaner.spec
 

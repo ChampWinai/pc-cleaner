@@ -3,7 +3,7 @@
 ; Menu shortcut, and an optional Desktop shortcut.
 
 #define MyAppName "PC Cleaner"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppExeName "PCCleaner.exe"
 
 [Setup]
