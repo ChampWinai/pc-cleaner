@@ -224,12 +224,10 @@ class Api:
 
 
     def scan(self, deep=False):
-        def on_progress(label):
-            if self.window:
-                safe_label = label.replace("\\", "\\\\").replace("'", "\\'")
-                self.window.evaluate_js(f"window.onScanProgress && window.onScanProgress('{safe_label}')")
-
-        return backend.scan(deep=deep, on_progress=on_progress)
+        # No evaluate_js progress callback: calling it from this worker thread
+        # while the UI thread is busy can deadlock WebView2 ("Not Responding"),
+        # and the scan finishes in well under a second anyway.
+        return backend.scan(deep=deep)
 
     def get_children(self, path):
         return backend.list_children(path)
