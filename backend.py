@@ -1341,8 +1341,6 @@ def network_flush():
     results = []
     commands = [
         ("ipconfig /flushdns", "Flush DNS"),
-        ("ipconfig /release", "Release IP"),
-        ("ipconfig /renew", "Renew IP"),
         ("netsh winsock reset", "Winsock Reset")
     ]
     for cmd, name in commands:

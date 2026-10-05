@@ -256,21 +256,21 @@
           <div class="app-name">Windows Debloat</div>
           <div class="app-publisher">ลบแอปขยะที่มาพร้อมกับ Windows (เช่น Xbox, Candy Crush)</div>
         </div>
-        <button class="btn btn-danger" onclick="window.pywebview.api.debloat_windows().then(res => alert('ทำความสะอาดสำเร็จ!'))">เริ่มทำความสะอาด</button>
+        <button class="btn btn-danger" onclick="if (confirm('ถอนการติดตั้งแอป Windows ที่มากับเครื่อง (Xbox, Maps, Camera ฯลฯ) ย้อนกลับไม่ได้ ดำเนินการต่อ?')) window.pywebview.api.debloat_windows().then(res => alert('ถอนสำเร็จ ' + res.filter(r => r.success).length + '/' + res.length + ' รายการ'))">เริ่มทำความสะอาด</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">บล็อก Telemetry (ความเป็นส่วนตัว)</div>
           <div class="app-publisher">ปิดการส่งข้อมูลการใช้งานกลับไปยัง Microsoft</div>
         </div>
-        <button class="btn btn-warning" onclick="window.pywebview.api.disable_telemetry().then(res => alert('ปิด Telemetry สำเร็จ!'))">ปิด Telemetry</button>
+        <button class="btn btn-warning" onclick="window.pywebview.api.disable_telemetry().then(res => alert(res.every(r => r.success) ? 'ปิด Telemetry สำเร็จ' : 'บางรายการล้มเหลว (ต้องรันแบบ Administrator)'))">ปิด Telemetry</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">ปรับปรุง Registry</div>
           <div class="app-publisher">เคลียร์แคชและค่าที่ตกค้างในระบบอย่างปลอดภัย</div>
         </div>
-        <button class="btn btn-accent" onclick="window.pywebview.api.clean_registry().then(res => alert('จัดการ Registry สำเร็จ!'))">ปรับปรุงตอนนี้</button>
+        <button class="btn btn-accent" onclick="window.pywebview.api.clean_registry().then(res => alert(res.message))">ปรับปรุงตอนนี้</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
@@ -284,7 +284,7 @@
           <div class="app-name">ล้างเครือข่าย (Network Flush)</div>
           <div class="app-publisher">รีเซ็ต DNS และ Winsock เพื่อแก้ปัญหาเน็ตหลุด</div>
         </div>
-        <button class="btn btn-accent" onclick="window.pywebview.api.network_flush().then(res => alert('ล้างเครือข่ายสำเร็จ!'))">ล้างแคชเน็ต</button>
+        <button class="btn btn-accent" onclick="window.pywebview.api.network_flush().then(res => alert('สำเร็จ ' + res.filter(r => r.success).length + '/' + res.length + ' รายการ (Winsock ต้องรีสตาร์ทเครื่อง)'))">ล้างแคชเน็ต</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
