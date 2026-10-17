@@ -696,95 +696,94 @@ input:checked + .slider:before {
 
 
 /* =====================================================================
-   Glass refresh — calmer, minimal frosted look. Overrides the neon/HUD
-   tokens above: no grid, no glow, soft aurora, one blue->violet accent.
+   v2 — "Operations console" glass. Palette from ui-ux-pro-max (dark tech +
+   status green): slate surfaces, one green accent, SVG icons, sidebar nav.
+   Overrides the earlier neon/HUD tokens.
 ===================================================================== */
-:root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
-  --glow-strength: 0;
-}
+:root, :root[data-theme="dark"], :root:not([data-theme="light"]) { --glow-strength: 0; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d0f17;
-    --glass-bg: rgba(255, 255, 255, 0.045);
-    --glass-border: rgba(255, 255, 255, 0.09);
-    --glass-shadow: rgba(0, 0, 0, 0.35);
-    --card-hover: rgba(255, 255, 255, 0.075);
-    --accent: #6c8cff;
-    --accent-2: #8fb0ff;
-    --accent-rgb: 108, 140, 255;
-    --bg-orb-1: #3b2f8f;
-    --bg-orb-2: #0f5d7a;
+    --bg: #0F172A; --text: #F1F5F9; --text-dim: #94A3B8;
+    --glass-bg: rgba(27, 35, 54, 0.72); --glass-border: rgba(148, 163, 184, 0.16);
+    --glass-shadow: rgba(2, 6, 23, 0.45); --card-hover: rgba(39, 47, 66, 0.85);
+    --accent: #22C55E; --accent-2: #4ADE80; --accent-rgb: 34, 197, 94;
+    --bg-orb-1: #134e4a; --bg-orb-2: #1e3a8a; --track: rgba(148, 163, 184, 0.12);
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0d0f17;
-  --glass-bg: rgba(255, 255, 255, 0.045);
-  --glass-border: rgba(255, 255, 255, 0.09);
-  --glass-shadow: rgba(0, 0, 0, 0.35);
-  --card-hover: rgba(255, 255, 255, 0.075);
-  --accent: #6c8cff;
-  --accent-2: #8fb0ff;
-  --accent-rgb: 108, 140, 255;
-  --bg-orb-1: #3b2f8f;
-  --bg-orb-2: #0f5d7a;
+  --bg: #0F172A; --text: #F1F5F9; --text-dim: #94A3B8;
+  --glass-bg: rgba(27, 35, 54, 0.72); --glass-border: rgba(148, 163, 184, 0.16);
+  --glass-shadow: rgba(2, 6, 23, 0.45); --card-hover: rgba(39, 47, 66, 0.85);
+  --accent: #22C55E; --accent-2: #4ADE80; --accent-rgb: 34, 197, 94;
+  --bg-orb-1: #134e4a; --bg-orb-2: #1e3a8a; --track: rgba(148, 163, 184, 0.12);
 }
 body::before { display: none; }
 body { font-family: "Segoe UI Variable Text", "Segoe UI", "Leelawadee UI", sans-serif; }
-.bg-orb { filter: blur(140px); opacity: 0.45; }
+.bg-orb { filter: blur(150px); opacity: 0.35; }
 
-.glass {
-  border-radius: 20px;
-  box-shadow: 0 10px 40px var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-.glow-hover:hover {
-  background: var(--card-hover);
-  border-color: rgba(255, 255, 255, 0.16);
-  transform: translateY(-1px);
-  box-shadow: 0 14px 44px var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
+/* Icons (SVG sprite, stroke inherits text colour) */
+.ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8;
+       stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+.card-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+             background: rgba(var(--accent-rgb), 0.12); color: var(--accent-2); filter: none; }
+.card-icon .ico { width: 20px; height: 20px; }
+.card:hover .card-icon { filter: none; background: rgba(var(--accent-rgb), 0.2); }
+.btn-close { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; }
+.btn-close:hover { background: var(--track); color: var(--text); }
+.btn .ico { margin-right: 4px; }
 
-.brand-mark {
-  background: linear-gradient(135deg, var(--accent-2), #b58cff);
-  -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none;
-}
-.brand-name { letter-spacing: 0.2px; }
+/* Layout: top bar + sidebar rail + content */
+body { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.topbar, .update-banner { grid-column: 1 / -1; }
+.tabbar { grid-column: 1; grid-row: 3 / span 2; }
+.layout { grid-column: 2; grid-row: 3; height: auto; min-height: 0; padding: 4px 24px 16px 8px; }
+.footer { grid-column: 2; grid-row: 4; padding: 10px 24px 16px 8px; }
+.topbar { padding: 16px 24px 12px; }
 
-/* Tabs: one pill track, no wrapping, scrolls if the window is narrow. */
 .tabbar {
-  margin: 0 28px 12px; padding: 4px; gap: 2px;
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  border-radius: 14px; overflow-x: auto; scrollbar-width: none;
-  backdrop-filter: blur(20px);
+  display: flex; flex-direction: column; gap: 2px; margin: 0 0 16px 16px; padding: 8px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 18px;
+  backdrop-filter: blur(20px); overflow-y: auto; align-self: start;
 }
-.tabbar::-webkit-scrollbar { display: none; }
-.tab-btn { white-space: nowrap; flex: 1 0 auto; border-radius: 10px; padding: 8px 12px; font-weight: 600; }
+.tab-btn {
+  display: flex; align-items: center; gap: 10px; text-align: left; width: 100%;
+  padding: 10px 12px; font-size: 13px; font-weight: 600; border-radius: 12px; cursor: pointer;
+  color: var(--text-dim); border: 1px solid transparent; background: transparent;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.tab-btn:hover { background: var(--track); color: var(--text); }
 .tab-btn.active {
-  color: var(--text);
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.35), rgba(181, 140, 255, 0.28));
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.25);
+  color: var(--text); background: rgba(var(--accent-rgb), 0.14);
+  border-color: rgba(var(--accent-rgb), 0.35); box-shadow: none;
 }
+.tab-btn.active .ico { color: var(--accent-2); }
 
-.btn { border-radius: 12px; }
-.btn-accent { background: linear-gradient(135deg, var(--accent), #a07bff); color: #fff; }
-.btn-accent:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(var(--accent-rgb), 0.4); }
+.glass { border-radius: 20px; box-shadow: 0 10px 36px var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.glow-hover:hover { background: var(--card-hover); border-color: rgba(148, 163, 184, 0.28); transform: translateY(-1px); box-shadow: 0 14px 40px var(--glass-shadow); }
+
+.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px;
+              background: linear-gradient(135deg, #22C55E, #14B8A6); color: #04210f; }
+.brand-mark .ico { width: 18px; height: 18px; stroke-width: 2.2; }
+.brand-name { font-weight: 800; letter-spacing: 0.2px; }
+
+.btn { border-radius: 12px; min-height: 38px; }
+.btn-accent { background: linear-gradient(135deg, #22C55E, #14B8A6); color: #04210f; }
+.btn-accent:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(var(--accent-rgb), 0.35); }
+.btn-ghost { background: var(--track); }
 .ring-fill { stroke: url(#ringGrad); filter: none; }
 
 .topbar-status { display: flex; align-items: center; gap: 10px; }
-.ver-chip {
-  font-size: 11px; color: var(--text-dim); background: var(--glass-bg);
-  border: 1px solid var(--glass-border); border-radius: 999px; padding: 3px 10px; cursor: pointer;
-}
+.ver-chip { font-size: 11px; color: var(--text-dim); background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 999px; padding: 4px 11px; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; }
 .ver-chip:hover { color: var(--text); border-color: rgba(var(--accent-rgb), 0.5); }
 
 /* Update banner */
 .update-banner {
   position: relative; z-index: 2; display: flex; align-items: center; gap: 10px;
-  margin: 0 28px 12px; padding: 14px 18px; border-radius: 18px;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.18), rgba(181, 140, 255, 0.14));
-  border: 1px solid rgba(var(--accent-rgb), 0.35);
-  backdrop-filter: blur(24px);
-  animation: bannerIn 0.4s cubic-bezier(.2,.8,.2,1);
+  margin: 0 24px 12px; padding: 14px 18px; border-radius: 18px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.16), rgba(20, 184, 166, 0.1));
+  border: 1px solid rgba(var(--accent-rgb), 0.35); backdrop-filter: blur(24px);
+  animation: rise 0.4s cubic-bezier(.2,.8,.2,1);
 }
 .update-banner.hidden { display: none; }
 .update-info { flex: 1; min-width: 0; }
@@ -793,10 +792,26 @@ body { font-family: "Segoe UI Variable Text", "Segoe UI", "Leelawadee UI", sans-
 .update-bar { height: 4px; border-radius: 4px; background: var(--track); margin-top: 8px; overflow: hidden; display: none; }
 .update-banner.busy .update-bar { display: block; }
 .update-banner.busy #btnUpdateLater { display: none; }
-.update-bar-fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--accent), #b58cff); transition: width 0.3s ease; }
-@keyframes bannerIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } }
+.update-bar-fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #22C55E, #14B8A6); transition: width 0.3s ease; }
 
-/* Layout adapts to the (optional) update banner instead of a fixed 168px. */
-body { display: flex; flex-direction: column; }
-.layout { flex: 1; min-height: 0; height: auto; }
+/* Motion: cards rise in with a stagger; keyboard focus is always visible. */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.layout > .glass, .cards-row > .glass { animation: rise 0.45s cubic-bezier(.2,.8,.2,1) both; }
+.layout > :nth-child(2) { animation-delay: 0.05s; } .layout > :nth-child(3) { animation-delay: 0.1s; }
+.layout > :nth-child(4) { animation-delay: 0.15s; }
+:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 10px; }
+button, select, input[type="checkbox"], .ver-chip { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Narrow window: sidebar collapses to an icon rail. */
+@media (max-width: 860px) {
+  body { grid-template-columns: 64px minmax(0, 1fr); }
+  .tab-btn span { display: none; }
+  .tab-btn { justify-content: center; padding: 12px 0; }
+  .tabbar { margin-left: 10px; }
+}
+
+/* Cards wrap instead of squeezing; slimmer sidebar. */
+body { grid-template-columns: 196px minmax(0, 1fr); }
+.cards-row { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card .btn { flex: none; white-space: nowrap; }

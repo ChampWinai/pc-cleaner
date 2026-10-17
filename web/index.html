@@ -6,6 +6,25 @@
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/></symbol>
+<symbol id="i-package" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></symbol>
+<symbol id="i-rocket" viewBox="0 0 24 24"><path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2M12 15l-3-3a22 22 0 0 1 2-4 12 12 0 0 1 11-5c0 3-1 8-5 11a22 22 0 0 1-5 1zM9 12H4s.5-3 2-4c1.5-1 5 0 5 0M12 15v5s3-.5 4-2c1-1.5 0-5 0-5"/></symbol>
+<symbol id="i-gamepad" viewBox="0 0 24 24"><path d="M6 12h4M8 10v4M15 13h.01M18 11h.01M17.3 5H6.7a4 4 0 0 0-3.9 3.2L2 15a3 3 0 0 0 5 2l1.5-2h7L17 17a3 3 0 0 0 5-2l-.8-6.8A4 4 0 0 0 17.3 5z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+<symbol id="i-memory" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 17v3M11 17v3M15 17v3M7 10v4M11 10v4M15 10v4"/></symbol>
+<symbol id="i-bin" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M5 6l1 14h12l1-14"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10h14V9M10 13h4"/></symbol>
+<symbol id="i-container" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM12 3v18M3 8l9 5 9-5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></symbol>
+</defs></svg>
   <div class="bg-orb orb-1"></div>
   <div class="bg-orb orb-2"></div>
 
@@ -13,7 +32,7 @@
 
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">✦</span>
+      <span class="brand-mark"><svg class="ico" aria-hidden="true"><use href="#i-sparkles"/></svg></span>
       <span class="brand-name">PC Cleaner</span>
     </div>
     <div class="topbar-status"><span id="statusText">กำลังสแกน...</span> <button class="ver-chip mono" id="btnCheckUpdate" title="ตรวจอัปเดต">v<span id="appVersion">-</span></button></div>
@@ -29,14 +48,14 @@
     <button class="btn btn-accent" id="btnUpdateNow">อัปเดตเลย</button>
   </div>
 
-  <nav class="tabbar">
-    <button class="tab-btn active" data-tab="clean">🧹 ล้างไฟล์ขยะ</button>
-    <button class="tab-btn" data-tab="uninstall">📦 ถอนการติดตั้ง</button>
-    <button class="tab-btn" data-tab="startup">🚀 โปรแกรมเริ่มต้น</button>
-    <button class="tab-btn" data-tab="gamemode">🎮 Game Mode</button>
-    <button class="tab-btn" data-tab="privacy">🔒 ความเป็นส่วนตัว</button>
-    <button class="tab-btn" data-tab="drivers">🔧 ฮาร์ดแวร์ &amp; ไดรเวอร์</button>
-      <button class="tab-btn" data-tab="advanced">🛠️ เครื่องมือขั้นสูง</button>
+  <nav class="tabbar" aria-label="เมนูหลัก">
+    <button class="tab-btn active" data-tab="clean"><svg class="ico" aria-hidden="true"><use href="#i-sparkles"/></svg><span>ล้างไฟล์ขยะ</span></button>
+    <button class="tab-btn" data-tab="uninstall"><svg class="ico" aria-hidden="true"><use href="#i-package"/></svg><span>ถอนการติดตั้ง</span></button>
+    <button class="tab-btn" data-tab="startup"><svg class="ico" aria-hidden="true"><use href="#i-rocket"/></svg><span>โปรแกรมเริ่มต้น</span></button>
+    <button class="tab-btn" data-tab="gamemode"><svg class="ico" aria-hidden="true"><use href="#i-gamepad"/></svg><span>Game Mode</span></button>
+    <button class="tab-btn" data-tab="privacy"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg><span>ความเป็นส่วนตัว</span></button>
+    <button class="tab-btn" data-tab="drivers"><svg class="ico" aria-hidden="true"><use href="#i-cpu"/></svg><span>ฮาร์ดแวร์ &amp; ไดรเวอร์</span></button>
+      <button class="tab-btn" data-tab="advanced"><svg class="ico" aria-hidden="true"><use href="#i-sliders"/></svg><span>เครื่องมือขั้นสูง</span></button>
   </nav>
 
   <main class="layout tab-panel" id="tab-clean">
@@ -49,7 +68,7 @@
       </div>
       <div class="summary-right">
         <svg viewBox="0 0 120 120" class="ring">
-          <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6c8cff"/><stop offset="1" stop-color="#b58cff"/></linearGradient></defs>
+          <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22C55E"/><stop offset="1" stop-color="#14B8A6"/></linearGradient></defs>
           <circle cx="60" cy="60" r="52" class="ring-track" />
           <circle cx="60" cy="60" r="52" class="ring-fill" id="ringFill" />
         </svg>
@@ -75,7 +94,7 @@
     <!-- Tool cards -->
     <section class="cards-row">
       <div class="glass glow-hover card">
-        <div class="card-icon">🧠</div>
+        <div class="card-icon"><svg class="ico" aria-hidden="true"><use href="#i-memory"/></svg></div>
         <div class="card-body">
           <div class="card-title">หน่วยความจำ (RAM)</div>
           <div class="card-value mono" id="ramText">กำลังตรวจสอบ...</div>
@@ -85,7 +104,7 @@
       </div>
 
       <div class="glass glow-hover card" style="--glow-rgb: var(--danger-rgb);">
-        <div class="card-icon">🧺</div>
+        <div class="card-icon"><svg class="ico" aria-hidden="true"><use href="#i-bin"/></svg></div>
         <div class="card-body">
           <div class="card-title">ถังขยะ (Recycle Bin)</div>
           <div class="card-value muted">ลบไฟล์ที่ทิ้งไปแล้วอย่างถาวร</div>
@@ -94,7 +113,7 @@
       </div>
 
       <div class="glass glow-hover card" style="--glow-rgb: var(--purple-rgb);">
-        <div class="card-icon">🗄</div>
+        <div class="card-icon"><svg class="ico" aria-hidden="true"><use href="#i-archive"/></svg></div>
         <div class="card-body">
           <div class="card-title">Safety Vault</div>
           <div class="card-value mono" id="vaultText">0 รายการ</div>
@@ -103,7 +122,7 @@
       </div>
 
       <div class="glass glow-hover card">
-        <div class="card-icon">🐳</div>
+        <div class="card-icon"><svg class="ico" aria-hidden="true"><use href="#i-container"/></svg></div>
         <div class="card-body">
           <div class="card-title">Docker Cache</div>
           <div class="card-value muted" id="dockerText">กำลังตรวจสอบ...</div>
@@ -112,7 +131,7 @@
       </div>
 
       <div class="glass glow-hover card" style="--glow-rgb: var(--purple-rgb);">
-        <div class="card-icon">🤖</div>
+        <div class="card-icon"><svg class="ico" aria-hidden="true"><use href="#i-clock"/></svg></div>
         <div class="card-body">
           <div class="card-title">ล้างอัตโนมัติ</div>
           <div class="card-value muted" id="autoCleanText">ปิดอยู่</div>
@@ -149,7 +168,7 @@
   <!-- App Uninstaller tab -->
   <main class="layout tab-panel hidden" id="tab-uninstall">
     <section class="glass glow-hover panel-list panel-tall">
-      <div class="panel-title">📦 โปรแกรมที่ติดตั้งไว้ (เรียงตามขนาด)</div>
+      <div class="panel-title">โปรแกรมที่ติดตั้งไว้ (เรียงตามขนาด)</div>
       <div class="panel-sub">คลิก "ถอนการติดตั้ง" เพื่อเปิดตัวถอนการติดตั้งของโปรแกรมนั้นๆ โดยตรง (เหมือนใช้ Apps & Features ของ Windows)</div>
       <div id="appList" class="item-list"></div>
     </section>
@@ -158,7 +177,7 @@
   <!-- Startup Manager tab -->
   <main class="layout tab-panel hidden" id="tab-startup">
     <section class="glass glow-hover panel-list panel-tall">
-      <div class="panel-title">🚀 โปรแกรมที่เปิดพร้อม Windows</div>
+      <div class="panel-title">โปรแกรมที่เปิดพร้อม Windows</div>
       <div class="panel-sub">ปิดโปรแกรมที่ไม่จำเป็นเพื่อบูตเร็วขึ้น หรือหน่วงเวลาเปิด 2 นาทีแทนการปิดถาวร</div>
       <div id="startupList" class="item-list"></div>
     </section>
@@ -172,7 +191,7 @@
         <div class="summary-value" id="gameModeStatus" style="font-size:22px;">ปิดอยู่</div>
         <div class="summary-sub">เลือกโปรแกรมพื้นหลังที่จะ "แช่แข็ง" ชั่วคราวตอนเล่นเกม/เรนเดอร์งาน แล้วกดคืนค่าเมื่อเลิกใช้</div>
       </div>
-      <button class="btn btn-accent" id="btnGameModeToggle" style="width:140px;">🎮 เปิด Game Mode</button>
+      <button class="btn btn-accent" id="btnGameModeToggle" style="width:140px;"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg> เปิด Game Mode</button>
     </section>
     <section class="glass glow-hover panel-list panel-tall">
       <div class="panel-title">โปรแกรมที่กำลังทำงาน (เรียงตามหน่วยความจำ)</div>
@@ -185,11 +204,11 @@
   <main class="layout tab-panel hidden" id="tab-privacy">
     <section class="glass glow-hover panel-summary" style="--glow-rgb: var(--purple-rgb);">
       <div class="summary-left">
-        <div class="summary-label">🔒 ตัวสแกนหาข้อมูลอ่อนไหว</div>
+        <div class="summary-label">ตัวสแกนหาข้อมูลอ่อนไหว</div>
         <div class="summary-sub" id="privacyFolderText">ยังไม่ได้เลือกโฟลเดอร์</div>
         <div class="summary-sub" style="margin-top:6px;">สแกนหาเลขบัตรประชาชน, เลขบัตรเครดิต, และรหัสผ่านที่อยู่ในไฟล์ข้อความ (heuristic ไม่ใช่ AI จริง — อาจมีทั้ง false positive/negative)</div>
       </div>
-      <button class="btn btn-privacy" id="btnPickFolder" style="width:150px;">📁 เลือกโฟลเดอร์</button>
+      <button class="btn btn-privacy" id="btnPickFolder" style="width:150px;"><svg class="ico" aria-hidden="true"><use href="#i-folder"/></svg> เลือกโฟลเดอร์</button>
     </section>
     <section class="glass glow-hover panel-list panel-tall" style="--glow-rgb: var(--purple-rgb);">
       <div class="panel-title">ผลการสแกน</div>
@@ -201,7 +220,7 @@
   <main class="layout tab-panel hidden" id="tab-drivers">
     <section class="glass glow-hover panel-summary">
       <div class="summary-left">
-        <div class="summary-label">🔧 อัปเดตไดรเวอร์</div>
+        <div class="summary-label">อัปเดตไดรเวอร์</div>
         <div class="summary-sub" id="driverUpdateText">ยังไม่ได้ตรวจสอบ</div>
       </div>
       <button class="btn btn-accent" id="btnCheckDrivers" style="width:180px;">ตรวจสอบอัปเดต</button>
@@ -225,8 +244,8 @@
       <button class="btn btn-ghost" id="btnRescan">⟳ สแกนใหม่</button>
     </div>
     <div class="footer-right">
-      <button class="btn btn-danger" id="btnCleanSelected" disabled>🗑 ลบรายการที่เลือก</button>
-      <button class="btn btn-accent" id="btnCleanAll" disabled>🚀 ล้างทั้งหมด</button>
+      <button class="btn btn-danger" id="btnCleanSelected" disabled><svg class="ico" aria-hidden="true"><use href="#i-trash"/></svg> ลบรายการที่เลือก</button>
+      <button class="btn btn-accent" id="btnCleanAll" disabled><svg class="ico" aria-hidden="true"><use href="#i-sparkles"/></svg> ล้างทั้งหมด</button>
     </div>
   </footer>
 
@@ -234,8 +253,8 @@
   <div id="vaultModal" class="modal-backdrop hidden">
     <div class="glass modal" style="border-color: rgba(var(--purple-rgb), 0.3);">
       <div class="modal-header">
-        <div class="panel-title">🗄 Safety Vault</div>
-        <button class="btn-close" id="btnCloseVault">✕</button>
+        <div class="panel-title">Safety Vault</div>
+        <button class="btn-close" id="btnCloseVault" aria-label="ปิด"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
       <div class="modal-sub">ไฟล์เหล่านี้จะถูกลบถาวรอัตโนมัติหลัง 14 วัน — กู้คืนได้ตลอดก่อนหน้านั้น</div>
       <div id="vaultList" class="vault-list"></div>

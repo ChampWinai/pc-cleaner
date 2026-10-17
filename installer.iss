@@ -3,7 +3,7 @@
 ; Menu shortcut, and an optional Desktop shortcut.
 
 #define MyAppName "PC Cleaner"
-#define MyAppVersion "1.1.3"
+#define MyAppVersion "1.1.4"
 #define MyAppExeName "PCCleaner.exe"
 
 [Setup]
@@ -21,6 +21,8 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 WizardStyle=modern
+CloseApplications=force
+RestartApplications=no
 
 [Languages]
 Name: "thai"; MessagesFile: "compiler:Languages\Thai.isl"
@@ -39,3 +41,16 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "เปิด {#MyAppName} ทันที"; Flags: nowait postinstall skipifsilent runascurrentuser
+
+[Code]
+// PCCleaner.exe is often still running (the window, or the hourly headless
+// --auto-clean run) which makes "DeleteFile failed; code 5". Stop it first.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Code: Integer;
+begin
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/end /tn PCCleaner_AutoClean', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Sleep(800);
+  Result := '';
+end;
