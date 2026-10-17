@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+PackageIdentifier: ChampWinai.PCCleaner
+PackageVersion: 1.3.0
+InstallerType: inno
+Scope: machine
+ElevationRequirement: elevatesSelf
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/ChampWinai/pc-cleaner/releases/download/v1.3.0/PCCleaner-Setup.exe
+    InstallerSha256: 4413AC5B656737A774B032577A99C50EC624BA78C75D5EDF402E04D470C7F40F
+ManifestType: installer
+ManifestVersion: 1.6.0

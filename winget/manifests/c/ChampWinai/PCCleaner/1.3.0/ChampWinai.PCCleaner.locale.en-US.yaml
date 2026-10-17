@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: ChampWinai.PCCleaner
+PackageVersion: 1.3.0
+PackageLocale: en-US
+Publisher: ChampWinai
+PublisherUrl: https://github.com/ChampWinai
+PackageName: PC Cleaner
+PackageUrl: https://github.com/ChampWinai/pc-cleaner
+License: Proprietary
+ShortDescription: Junk cleaner for Windows with a 14-day Safety Vault, auto clean, startup manager and Game Mode.
+Tags:
+  - cleaner
+  - disk-cleanup
+  - junk
+  - optimizer
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
