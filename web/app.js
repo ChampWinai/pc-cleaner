@@ -9,8 +9,7 @@ const state = {
   ramTimer: null,
   crumbs: [],      // [{label, nodes}] drill-down breadcrumb trail for the treemap
   darkMode: localStorage.getItem('darkMode') === 'true' || window.matchMedia('(prefers-color-scheme: dark)').matches,
-  currentOperation: null,
-  operationProgress: { progress: 0, total: 0, percentage: 0 },
+  retentionDays: 14,
 };
 
 const RISK_COLOR = { safe: "#30D158", low: "#FF9F0A", medium: "#FF6B35", high: "#FF453A" };
@@ -31,123 +30,6 @@ function initTheme() {
   }
 }
 
-function toggleTheme() {
-  state.darkMode = !state.darkMode;
-  localStorage.setItem('darkMode', state.darkMode);
-  initTheme();
-  
-  // Send to backend
-  if (api && api.set_config) {
-    api.set_config('ui.dark_mode', state.darkMode).catch(() => {});
-  }
-}
-
-async function syncThemeFromConfig() {
-  if (api && api.get_config) {
-    const darkMode = await api.get_config('ui.dark_mode', state.darkMode);
-    state.darkMode = darkMode;
-    initTheme();
-  }
-}
-
-// =========================================================================
-// OPERATION PROGRESS TRACKING
-// =========================================================================
-function createOperationId() {
-  return 'op_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-}
-
-async function startOperationTracking(operationName) {
-  state.currentOperation = createOperationId();
-  if (api && api.create_operation) {
-    await api.create_operation(state.currentOperation).catch(() => {});
-  }
-  return state.currentOperation;
-}
-
-async function cancelOperation() {
-  if (state.currentOperation && api && api.cancel_operation) {
-    await api.cancel_operation(state.currentOperation).catch(() => {});
-  }
-}
-
-async function updateOperationProgress() {
-  if (!state.currentOperation || !api || !api.get_operation_progress) return;
-  
-  try {
-    const progress = await api.get_operation_progress(state.currentOperation);
-    state.operationProgress = progress;
-    
-    // Update UI progress bars if they exist
-    const progressBar = $('operation-progress-bar');
-    if (progressBar) {
-      progressBar.style.width = progress.percentage + '%';
-    }
-    
-    const progressPercent = $('operation-progress-percent');
-    if (progressPercent) {
-      progressPercent.textContent = progress.percentage + '%';
-    }
-  } catch (e) {
-    // Silent fail
-  }
-}
-
-async function stopOperationTracking() {
-  if (state.currentOperation && api && api.cleanup_operation) {
-    await api.cleanup_operation(state.currentOperation).catch(() => {});
-  }
-  state.currentOperation = null;
-  state.operationProgress = { progress: 0, total: 0, percentage: 0 };
-}
-
-// =========================================================================
-// CONFIGURATION MANAGEMENT UI
-// =========================================================================
-async function loadSettings() {
-  if (!api || !api.get_all_config) return;
-  
-  try {
-    const config = await api.get_all_config();
-    
-    // Update UI elements based on config
-    const darkModeToggle = $('theme-dark-toggle');
-    if (darkModeToggle) {
-      darkModeToggle.checked = config.ui?.dark_mode || false;
-    }
-    
-    const autoCleanToggle = $('auto-clean-toggle');
-    if (autoCleanToggle) {
-      autoCleanToggle.checked = config.cleaning?.auto_clean_enabled || false;
-    }
-    
-    const enableLoggingToggle = $('enable-logging-toggle');
-    if (enableLoggingToggle) {
-      enableLoggingToggle.checked = config.general?.enable_logging !== false;
-    }
-  } catch (e) {
-    console.error('Failed to load settings:', e);
-  }
-}
-
-async function saveSettings() {
-  if (!api || !api.set_config) return;
-  
-  try {
-    const darkModeToggle = $('theme-dark-toggle');
-    if (darkModeToggle) {
-      await api.set_config('ui.dark_mode', darkModeToggle.checked);
-    }
-    
-    const autoCleanToggle = $('auto-clean-toggle');
-    if (autoCleanToggle) {
-      await api.set_config('cleaning.auto_clean_enabled', autoCleanToggle.checked);
-    }
-  } catch (e) {
-    console.error('Failed to save settings:', e);
-  }
-}
-
 // =========================================================================
 // CHECK FOR UPDATES
 // =========================================================================
@@ -163,6 +45,10 @@ async function checkForUpdates(manual = false) {
     $("updateVersion").textContent = r.version;
     $("updateBanner").classList.remove("hidden");
     $("btnUpdateNow").disabled = !r.can_install;
+    if (r.release_notes) {
+      $("updateNotes").textContent = r.release_notes;
+      $("updateNotesWrap").classList.remove("hidden");
+    }
     if (!r.can_install) $("updateSub").textContent = "ติดตั้งอัตโนมัติไม่ได้ — กดดูในหน้า Release";
   } catch (e) {
     console.error("Update check failed:", e);
@@ -189,29 +75,6 @@ async function startUpdate() {
       btn.disabled = false;
     }
   }, 400);
-}
-
-// =========================================================================
-// HISTORY & ANALYTICS
-// =========================================================================
-async function loadHistoryStats() {
-  if (!api || !api.get_history_stats) return;
-  
-  try {
-    const stats = await api.get_history_stats();
-    
-    const statsElement = $('history-stats');
-    if (statsElement) {
-      statsElement.innerHTML = `
-        <div>Total Scans: <strong>${stats.total_scans || 0}</strong></div>
-        <div>Total Cleaned: <strong>${humanSize(stats.total_cleaned_bytes || 0)}</strong></div>
-        <div>Errors: <strong>${stats.total_errors || 0}</strong></div>
-        <div>Vault Restores: <strong>${stats.total_vault_restores || 0}</strong></div>
-      `;
-    }
-  } catch (e) {
-    console.error('Failed to load history stats:', e);
-  }
 }
 
 // Initialize theme on load
@@ -445,6 +308,21 @@ async function drillInto(node) {
   paintTreemap(nodes);
 }
 
+async function showDiskMap() {
+  const btn = $("btnDiskMap");
+  btn.disabled = true;
+  $("treemap").innerHTML = `<div class="empty-state">กำลังวัดขนาดโฟลเดอร์ในไดรฟ์ C: (อาจใช้เวลา 1-2 นาที)...</div>`;
+  try {
+    const children = await api.get_children("C:\\");
+    const nodes = children.map((c) => ({ label: c.name, size: c.size, risk: null, note: "", path: c.path, is_dir: c.is_dir }));
+    state.crumbs = [...state.crumbs.slice(0, 1), { label: "C:", nodes }];
+    renderBreadcrumb();
+    paintTreemap(nodes);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function goToCrumb(index) {
   state.crumbs = state.crumbs.slice(0, index + 1);
   renderBreadcrumb();
@@ -524,7 +402,7 @@ async function performClean(selected) {
   }
   const total = selected.reduce((s, it) => s + it.size, 0);
   const risky = selected.filter((it) => it.risk === "medium" || it.risk === "high");
-  let body = `จะย้ายไฟล์ ${selected.length} รายการ รวม ${humanReadable(total)} เข้า Safety Vault (กู้คืนได้ 14 วัน)`;
+  let body = `จะย้ายไฟล์ ${selected.length} รายการ รวม ${humanReadable(total)} เข้า Safety Vault (กู้คืนได้ ${state.retentionDays} วัน)`;
   if (risky.length) {
     body += "\n\nควรตรวจสอบ:\n" + risky.map((it) => `• ${it.label}: ${it.note}`).join("\n");
   }
@@ -588,6 +466,31 @@ async function openHistory() {
     list.appendChild(row);
   });
   $("historyModal").classList.remove("hidden");
+}
+
+async function cleanWindowsOld() {
+  if (!(await api.windows_old_present())) return toast("ไม่พบ Windows.old บนเครื่องนี้", "info");
+  const ok = await confirmDialog("ยืนยันลบ Windows.old",
+    "จะเปิด Disk Cleanup ของ Windows ให้ลบการติดตั้ง Windows ก่อนหน้า หลังลบแล้วจะย้อนกลับไปเวอร์ชันเดิมไม่ได้");
+  if (!ok) return;
+  const r = await api.clean_windows_old();
+  toast(r.success ? "เริ่มลบแล้ว — ดูความคืบหน้าในหน้าต่าง Disk Cleanup" : "เริ่ม Disk Cleanup ไม่สำเร็จ ต้องรันแบบ Administrator",
+        r.success ? "success" : "error");
+}
+
+// Run a slow Advanced-tab action with its button disabled, then toast the result.
+async function runTool(btnId, call, describe, busyText) {
+  const btn = $(btnId);
+  btn.disabled = true;
+  if (busyText) toast(busyText, "info");
+  try {
+    const [msg, type] = describe(await call());
+    toast(msg, type);
+  } catch (e) {
+    toast(String(e), "error");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function openStorageCleanup() {
@@ -829,6 +732,58 @@ async function loadApps() {
     });
     list.appendChild(row);
   });
+}
+
+async function loadLeftovers() {
+  const list = $("leftoverList");
+  const btn = $("btnLeftovers");
+  btn.disabled = true;
+  list.innerHTML = `<div class="empty-state">กำลังตรวจ...</div>`;
+  const found = await api.find_leftovers();
+  btn.disabled = false;
+  list.innerHTML = found.length ? "" : `<div class="empty-state">ไม่พบไฟล์ตกค้าง</div>`;
+  found.forEach((f) => {
+    const row = document.createElement("div");
+    row.className = "app-row";
+    row.innerHTML = `<div class="app-row-info"><div class="app-row-name"></div><div class="app-row-meta"></div></div>
+      <div class="app-row-size">${f.size_human}</div><button class="btn btn-danger">ย้ายเข้า Vault</button>`;
+    row.querySelector(".app-row-name").textContent = f.app;
+    row.querySelector(".app-row-meta").textContent = f.path;
+    row.querySelector("button").addEventListener("click", async () => {
+      const r = await api.vault_leftover(f.path);
+      if (r.success) { toast("ย้ายเข้า Safety Vault แล้ว", "success"); row.remove(); refreshVaultCount(); }
+      else toast("ย้ายไม่สำเร็จ ไฟล์อาจถูกใช้งานอยู่", "error");
+    });
+    list.appendChild(row);
+  });
+}
+
+// ---------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------
+async function loadAppSettings() {
+  const s = await api.get_settings();
+  state.retentionDays = s.vault_retention_days;
+  return s;
+}
+
+async function openSettings() {
+  const s = await loadAppSettings();
+  $("setCloseToTray").checked = s.close_to_tray;
+  $("setRetention").value = s.vault_retention_days;
+  $("setJunkGb").value = s.junk_notify_gb;
+  $("settingsModal").classList.remove("hidden");
+}
+
+async function saveAppSettings() {
+  const s = await api.save_settings({
+    close_to_tray: $("setCloseToTray").checked,
+    vault_retention_days: Number($("setRetention").value) || 14,
+    junk_notify_gb: Number($("setJunkGb").value) || 0,
+  });
+  state.retentionDays = s.vault_retention_days;
+  $("settingsModal").classList.add("hidden");
+  toast("บันทึกการตั้งค่าแล้ว", "success");
 }
 
 // ---------------------------------------------------------------------
@@ -1143,6 +1098,24 @@ function init() {
   $("btnHistory").addEventListener("click", openHistory);
   $("btnCloseHistory").addEventListener("click", () => $("historyModal").classList.add("hidden"));
   $("btnStorageCleanup").addEventListener("click", openStorageCleanup);
+  $("btnWindowsOld").addEventListener("click", cleanWindowsOld);
+  $("btnTelemetry").addEventListener("click", () => runTool("btnTelemetry", () => api.disable_telemetry(),
+    (res) => res.every((r) => r.success) ? ["ปิด Telemetry สำเร็จ", "success"] : ["บางรายการล้มเหลว (ต้องรันแบบ Administrator)", "error"]));
+  $("btnRegistry").addEventListener("click", () => runTool("btnRegistry", () => api.clean_registry(),
+    (res) => [res.message, res.success === false ? "error" : "success"]));
+  $("btnDuplicates").addEventListener("click", () => runTool("btnDuplicates", () => api.find_duplicate_files("C:/"),
+    (res) => [`พบไฟล์ซ้ำ ${res.total_groups} กลุ่ม`, "info"], "กำลังค้นหาไฟล์ซ้ำใน C: (อาจใช้เวลานาน)..."));
+  $("btnNetFlush").addEventListener("click", () => runTool("btnNetFlush", () => api.network_flush(),
+    (res) => [`ล้างเครือข่ายสำเร็จ ${res.filter((r) => r.success).length}/${res.length} รายการ (Winsock ต้องรีสตาร์ทเครื่อง)`, "success"]));
+  $("btnWinget").addEventListener("click", () => runTool("btnWinget", () => api.update_software_winget(),
+    () => ["อัปเดตซอฟต์แวร์เสร็จสิ้น", "success"]));
+  $("btnDiskMap").addEventListener("click", showDiskMap);
+  $("btnLeftovers").addEventListener("click", loadLeftovers);
+  $("btnSettings").addEventListener("click", openSettings);
+  $("btnSettingsSave").addEventListener("click", saveAppSettings);
+  const closeSettings = () => $("settingsModal").classList.add("hidden");
+  $("btnSettingsCancel").addEventListener("click", closeSettings);
+  $("btnCloseSettings").addEventListener("click", closeSettings);
   $("btnDebloatRun").addEventListener("click", runDebloat);
   $("btnDebloatCancel").addEventListener("click", () => $("debloatModal").classList.add("hidden"));
   $("btnCloseDebloat").addEventListener("click", () => $("debloatModal").classList.add("hidden"));
@@ -1162,6 +1135,7 @@ function init() {
   initDocker();
   refreshAutoCleanStatus();
   refreshHistory();
+  loadAppSettings();
   checkForUpdates();
   state.ramTimer = setInterval(refreshRam, 5000);
 }

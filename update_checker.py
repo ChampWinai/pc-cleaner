@@ -11,7 +11,7 @@ import os
 
 log = logging.getLogger(__name__)
 
-CURRENT_VERSION = "1.2.0"  # Sync this with installer.iss line 6
+CURRENT_VERSION = "1.3.0"  # Sync this with installer.iss line 6
 GITHUB_REPO = "ChampWinai/pc-cleaner"
 INSTALLER_ASSET = "PCCleaner-Setup.exe"
 DOWNLOAD_PREFIX = f"https://github.com/{GITHUB_REPO}/releases/download/"
@@ -121,6 +121,15 @@ class UpdateChecker:
             [path, "/SILENT", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS", "/NORESTART"],
             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
         )
+
+    @staticmethod
+    def clean_notes(body, limit=600):
+        """Release body -> short plain text for the update banner: drop
+        markdown headings, the auto 'Full Changelog' link and co-author lines."""
+        lines = [l.strip().lstrip("#*- ").strip() for l in (body or "").splitlines()]
+        keep = [l for l in lines if l and not l.lower().startswith(("full changelog", "co-authored-by", "what's changed"))]
+        text = "\n".join(keep)
+        return text if len(text) <= limit else text[:limit].rstrip() + "…"
 
     @staticmethod
     def record_check_time():

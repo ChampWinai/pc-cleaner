@@ -33,6 +33,7 @@ class Api:
         self._update_info = None
         self._update_path = None
         self._update_state = {"state": "idle", "percent": 0, "message": ""}
+        self._quitting = False  # True = really exit instead of hiding to the tray
 
     # ========================================================================
     # INTERNATIONALIZATION
@@ -241,6 +242,20 @@ class Api:
         backend.record_clean_history("manual", selected, freed)
         return {"freed": freed, "freed_human": backend.human_size(freed), "errors": errors}
 
+    def clean_windows_old(self):
+        if not backend.windows_old_present():
+            return {"success": False, "windows_old": False}
+        return {"success": backend.clean_windows_old(), "windows_old": True}
+
+    def windows_old_present(self):
+        return backend.windows_old_present()
+
+    def get_settings(self):
+        return backend.app_settings()
+
+    def save_settings(self, settings):
+        return backend.save_app_settings(settings)
+
     def open_storage_cleanup(self):
         return {"success": backend.open_storage_cleanup(), "windows_old": backend.windows_old_present()}
 
@@ -320,6 +335,23 @@ class Api:
 
     def uninstall_app(self, app_id):
         return {"success": backend.uninstall_app(app_id)}
+
+    def find_leftovers(self):
+        found = backend.find_leftovers()
+        for f in found:
+            f["size_human"] = backend.human_size(f["size"])
+        return found
+
+    def vault_leftover(self, path):
+        """Only paths find_leftovers() itself reports -- never a UI-chosen path."""
+        hit = next((f for f in backend.find_leftovers() if f["path"] == path), None)
+        if not hit:
+            return {"success": False}
+        try:
+            backend.move_to_vault(path, f"leftover_{backend.uuid.uuid4().hex[:6]}", f"ไฟล์ตกค้าง: {hit['app']}")
+        except OSError:
+            return {"success": False}
+        return {"success": True}
 
     # ========================================================================
     # STARTUP MANAGER
@@ -496,7 +528,7 @@ class Api:
             "current": CURRENT_VERSION,
             "version": info['version'],
             "url": info['url'],
-            "release_notes": info['release_notes'],
+            "release_notes": UpdateChecker.clean_notes(info['release_notes']),
             "size": info['size'],
             "can_install": bool(info['sha256'] and info['download_url']),
         }
@@ -529,6 +561,7 @@ class Api:
         if self._update_state["state"] != "ready":
             return {"success": False}
         UpdateChecker.run_installer(self._update_path)
+        self._quitting = True
         if self._window:
             self._window.destroy()
         return {"success": True}

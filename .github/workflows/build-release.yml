@@ -58,10 +58,16 @@ jobs:
             PCCleaner-portable.zip
             installer_output\PCCleaner-Setup.exe
 
+      # The tagged commit's message becomes the notes the in-app update banner shows.
+      - name: Release notes from commit message
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: git log -1 --format=%B | Out-File -Encoding utf8 release_notes.md
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release_notes.md
           files: |
             PCCleaner-portable.zip
             installer_output\PCCleaner-Setup.exe

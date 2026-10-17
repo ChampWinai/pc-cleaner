@@ -107,10 +107,101 @@ def uninstall_app(app_id):
     cmd = app["quiet_uninstall_string"] or app["uninstall_string"]
     try:
         subprocess.Popen(cmd)
-        return True
     except OSError:
         log.warning("Failed to launch uninstaller: %s", cmd, exc_info=True)
         return False
+    _remember_uninstalled(app)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Leftovers — folders an uninstaller left behind. Only apps uninstalled from
+# this tool are tracked (their name + install folder), and only once they're
+# really gone from the registry, so live app data is never offered.
+# Registry leftovers are deliberately not touched: too easy to break things.
+# ---------------------------------------------------------------------------
+UNINSTALLED_LOG = os.path.join(VAULT_DIR, "uninstalled_apps.json")
+_LEFTOVER_SKIP = {"microsoft", "windows", "packages", "temp", "programs", "commonfiles", "installer"}
+
+
+def _load_uninstalled():
+    try:
+        with open(UNINSTALLED_LOG, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return []
+
+
+def _save_uninstalled(entries):
+    os.makedirs(os.path.dirname(UNINSTALLED_LOG), exist_ok=True)
+    with open(UNINSTALLED_LOG, "w", encoding="utf-8") as f:
+        json.dump(entries, f, ensure_ascii=False, indent=2)
+
+
+def _remember_uninstalled(app):
+    entries = [e for e in _load_uninstalled() if e["name"] != app["name"]]
+    entries.append({"name": app["name"], "publisher": app.get("publisher", ""),
+                    "install_location": app.get("install_location", "")})
+    _save_uninstalled(entries)
+
+
+def _norm(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _name_keys(name):
+    """'Foo Bar 2.1 (x64)' -> {'foobar21x64', 'foobar'}: folders are usually
+    named after the app without its version."""
+    base = re.sub(r"\(.*?\)", "", name)
+    base = re.sub(r"\s+v?\d[\d.]*.*$", "", base)
+    return {k for k in (_norm(name), _norm(base)) if len(k) >= 4} - _LEFTOVER_SKIP
+
+
+def _leftover_roots():
+    env = os.environ
+    return [r for r in (env.get("APPDATA"), env.get("LOCALAPPDATA"), env.get("PROGRAMDATA"),
+                        env.get("ProgramFiles"), env.get("ProgramFiles(x86)")) if r and os.path.isdir(r)]
+
+
+def _safe_leftover(path, roots):
+    """A strict sub-folder of a known root, never a root or anything in Windows."""
+    path = os.path.normcase(os.path.abspath(path))
+    windir = os.path.normcase(os.environ.get("SystemRoot", r"C:\Windows"))
+    if path.startswith(windir) or os.path.splitdrive(path)[1] in ("", "\\"):
+        return False
+    norm_roots = [os.path.normcase(os.path.abspath(r)) for r in roots]
+    return path not in norm_roots and any(path.startswith(r + os.sep) for r in norm_roots)
+
+
+def find_leftovers():
+    from backend import dir_size
+    installed = {_norm(a["name"]) for a in list_installed_apps()}
+    roots = _leftover_roots()
+    found, keep = [], []
+    for e in _load_uninstalled():
+        if _norm(e["name"]) in installed:  # uninstaller was cancelled
+            keep.append(e)
+            continue
+        keys = _name_keys(e["name"]) - installed
+        cands = set()
+        loc = e.get("install_location", "").strip('"')
+        if loc and os.path.isdir(loc):
+            cands.add(os.path.abspath(loc))
+        for root in roots:
+            pub = e.get("publisher")
+            for parent in [root] + ([os.path.join(root, pub)] if pub else []):
+                try:
+                    children = os.listdir(parent)
+                except OSError:
+                    continue
+                cands.update(os.path.join(parent, c) for c in children
+                             if _norm(c) in keys and os.path.isdir(os.path.join(parent, c)))
+        cands = [c for c in cands if _safe_leftover(c, roots)]
+        if cands:
+            keep.append(e)
+        found += [{"app": e["name"], "path": c, "size": dir_size(c)} for c in sorted(cands)]
+    _save_uninstalled(keep)  # apps with nothing left over drop off the list
+    return found
 
 
 # ---------------------------------------------------------------------------

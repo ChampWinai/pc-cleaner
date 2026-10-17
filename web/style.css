@@ -830,6 +830,7 @@ body { grid-template-columns: 196px minmax(0, 1fr); }
 
 /* Modals: near-opaque so text behind doesn't bleed through */
 .modal { background: rgba(22, 29, 46, 0.97); }
+:root[data-theme="light"] .modal { background: rgba(255, 255, 255, 0.98); }
 .modal-backdrop { backdrop-filter: blur(4px); }
 
 /* Advanced Tools list (markup had no styles) */
@@ -842,3 +843,17 @@ body { grid-template-columns: 196px minmax(0, 1fr); }
 .list-item .app-publisher { color: var(--text-dim); font-size: 12px; margin-top: 3px; }
 .list-item .btn { flex: none; min-width: 150px; }
 .btn-warning { background: linear-gradient(135deg, #F59E0B, #F97316); color: #2a1300; }
+
+/* v1.2.1: settings, update notes, disk map, leftovers */
+.ver-chip .ico { width: 13px; height: 13px; vertical-align: -2px; }
+.update-notes { margin-top: 6px; font-size: 12px; color: var(--text-dim); }
+.update-notes summary { cursor: pointer; color: var(--accent-2); }
+.update-notes div { white-space: pre-wrap; max-height: 120px; overflow-y: auto; margin-top: 4px; }
+.update-notes.hidden { display: none; }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+.leftover-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+               padding: 10px 0; border-bottom: 1px solid var(--glass-border); font-size: 13px; cursor: pointer; }
+.setting-row input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; }
+.setting-num { width: 72px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--glass-border);
+               background: var(--track); color: var(--text); font: inherit; }

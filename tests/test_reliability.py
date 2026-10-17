@@ -103,10 +103,11 @@ def test_list_bloatware_only_installed(monkeypatch):
     assert got[0]["checked"] is False
 
 
-def test_uninstall_app_runs_registry_command_without_shell(monkeypatch):
+def test_uninstall_app_runs_registry_command_without_shell(monkeypatch, tmp_path):
     import system_tools
+    monkeypatch.setattr(system_tools, "UNINSTALLED_LOG", str(tmp_path / "u.json"))
     monkeypatch.setattr(system_tools, "list_installed_apps", lambda: [
-        {"id": "Foo", "uninstall_string": r'"C:\Foo\unins.exe"', "quiet_uninstall_string": ""}])
+        {"id": "Foo", "name": "Foo", "uninstall_string": r'"C:\Foo\unins.exe"', "quiet_uninstall_string": ""}])
     launched = []
     monkeypatch.setattr(system_tools.subprocess, "Popen", lambda cmd, **kw: launched.append((cmd, kw)))
     assert backend.uninstall_app("Nope") is False

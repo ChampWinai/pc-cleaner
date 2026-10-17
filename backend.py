@@ -249,20 +249,19 @@ def list_children(path, limit=24):
     except OSError:
         return []
 
-    items = []
-    for name in names:
+    def measure(name):
         full = os.path.join(path, name)
         try:
-            if os.path.isdir(full):
-                size = dir_size(full)
-                is_dir = True
-            else:
-                size = os.path.getsize(full)
-                is_dir = False
+            if os.path.isdir(full) and not os.path.islink(full):
+                return {"name": name, "path": full, "size": dir_size(full), "is_dir": True}
+            return {"name": name, "path": full, "size": os.path.getsize(full), "is_dir": False}
         except OSError:
-            continue
-        if size > 0:
-            items.append({"name": name, "path": full, "size": size, "is_dir": is_dir})
+            return None
+
+    # Walking a whole drive's top folders one by one takes minutes; the walks
+    # are I/O-bound so threads overlap them well.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        items = [it for it in pool.map(measure, names) if it and it["size"] > 0]
 
     items.sort(key=lambda x: x["size"], reverse=True)
     if len(items) > limit:
@@ -448,7 +447,7 @@ def focus_existing_window(title="PC Cleaner"):
 # ---------------------------------------------------------------------------
 VAULT_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "PCCleanerVault")
 VAULT_INDEX_PATH = os.path.join(VAULT_DIR, "index.json")
-VAULT_RETENTION_DAYS = 14
+VAULT_RETENTION_DAYS = 14  # default; the user can change it in Settings
 
 
 _vault_thread_lock = threading.RLock()
@@ -597,7 +596,7 @@ def purge_expired_vault_entries():
     """Drop entries older than the retention window. The index is updated
     under the lock; the (possibly slow) file deletion happens after release
     so a big purge never blocks the UI or Auto Clean."""
-    cutoff = datetime.now() - timedelta(days=VAULT_RETENTION_DAYS)
+    cutoff = datetime.now() - timedelta(days=app_settings()["vault_retention_days"])
     with _vault_locked():
         still_valid, expired = [], []
         for entry in _load_vault_index():
@@ -629,6 +628,22 @@ def record_clean_history(kind, items, freed):
     scan_id = history_db.record_scan(kind, 0, len(items), freed)
     for it in items:
         history_db.record_cleaned_item(scan_id, it["label"], it["path"], it.get("size", 0))
+
+
+def clean_windows_old():
+    """Remove Windows.old the supported way: tick "Previous Installations" in
+    Disk Cleanup's saved profile 42 and run it (cleanmgr shows its own
+    progress). Windows.old is TrustedInstaller-owned, so we never rmtree it."""
+    import winreg
+    key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Previous Installations"
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, "StateFlags0042", 0, winreg.REG_DWORD, 2)
+        subprocess.Popen(["cleanmgr.exe", "/sagerun:42"])
+        return True
+    except OSError:
+        log.warning("cleanmgr Windows.old cleanup failed", exc_info=True)
+        return False
 
 
 def open_storage_cleanup():
@@ -810,13 +825,14 @@ def run_auto_clean(deep=False):
     return entry
 
 
-JUNK_NOTIFY_BYTES = 1024 ** 3  # 1 GB of junk Auto Clean isn't allowed to touch
 JUNK_NOTIFY_EVERY = timedelta(hours=24)
 
 
 def should_notify_junk(entry):
-    """True at most once a day, when non-safe junk worth reviewing piles up."""
-    if entry.get("review_bytes", 0) < JUNK_NOTIFY_BYTES:
+    """True at most once a day, when non-safe junk worth reviewing piles up
+    past the user's threshold (Settings; 0 turns the notice off)."""
+    gb = app_settings()["junk_notify_gb"]
+    if gb <= 0 or entry.get("review_bytes", 0) < gb * 1024 ** 3:
         return False
     settings = auto_clean_settings()
     last = settings.get("last_junk_notice")
@@ -825,6 +841,24 @@ def should_notify_junk(entry):
     settings["last_junk_notice"] = datetime.now().isoformat()
     _save_json(AUTO_CLEAN_SETTINGS_PATH, settings)
     return True
+
+
+APP_SETTINGS_PATH = os.path.join(VAULT_DIR, "app_settings.json")
+APP_SETTINGS_DEFAULT = {"close_to_tray": True, "vault_retention_days": VAULT_RETENTION_DAYS, "junk_notify_gb": 1}
+
+
+def app_settings():
+    return {**APP_SETTINGS_DEFAULT, **_load_json(APP_SETTINGS_PATH, {})}
+
+
+def save_app_settings(new):
+    """Validate everything: the values come straight from the UI."""
+    s = app_settings()
+    s["close_to_tray"] = bool(new.get("close_to_tray", s["close_to_tray"]))
+    s["vault_retention_days"] = max(1, min(90, int(new.get("vault_retention_days", s["vault_retention_days"]))))
+    s["junk_notify_gb"] = max(0.0, min(100.0, float(new.get("junk_notify_gb", s["junk_notify_gb"]))))
+    _save_json(APP_SETTINGS_PATH, s)
+    return s
 
 
 def auto_clean_last_run():
@@ -925,6 +959,7 @@ from system_tools import (  # noqa: E402,F401
     disable_startup_item,
     enable_game_mode,
     enable_startup_item,
+    find_leftovers,
     is_game_mode_active,
     list_drivers,
     list_freezable_processes,

@@ -3,7 +3,7 @@
 ; Menu shortcut, and an optional Desktop shortcut.
 
 #define MyAppName "PC Cleaner"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.3.0"
 #define MyAppExeName "PCCleaner.exe"
 
 [Setup]
@@ -41,6 +41,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "เปิด {#MyAppName} ทันที"; Flags: nowait postinstall skipifsilent runascurrentuser
+; In-app auto update installs with /SILENT: reopen the app afterwards.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait runascurrentuser; Check: WizardSilent
 
 [Code]
 // PCCleaner.exe is often still running (the window, or the hourly headless

@@ -25,7 +25,7 @@ def _enable_hang_dump():
     faulthandler.dump_traceback_later(10, repeat=True, file=f)
 
 
-def _setup_tray(window):
+def _setup_tray(window, api):
     def quick_clean():
         entry = backend.run_auto_clean()
         tray_manager.notify("PC Cleaner", f"ล้างด่วนเสร็จ ได้พื้นที่คืน {entry['freed_human']}")
@@ -34,10 +34,27 @@ def _setup_tray(window):
         window.show()
         window.restore()
 
+    def quit_app():
+        api._quitting = True
+        window.destroy()
+
+    told = []
+
+    def on_closing():
+        # X hides to the tray (Settings can turn this off); tray "ออก" quits.
+        if api._quitting or not tray_manager.icon or not backend.app_settings()["close_to_tray"]:
+            return True
+        window.hide()
+        if not told:
+            told.append(1)
+            tray_manager.notify("PC Cleaner", "ยังทำงานอยู่ที่ถาด (tray) — คลิกขวาที่ไอคอนเพื่อออก")
+        return False
+
     tray_manager.on_click_restore = open_window
     tray_manager.on_click_clean = lambda: threading.Thread(target=quick_clean, daemon=True).start()
-    tray_manager.on_click_quit = window.destroy
+    tray_manager.on_click_quit = quit_app
     tray_manager.show()
+    window.events.closing += on_closing
     window.events.closed += tray_manager.hide
 
 
@@ -74,7 +91,7 @@ def main():
         background_color="#0e0e16",
     )
     api._window = window
-    _setup_tray(window)
+    _setup_tray(window, api)
 
     webview.start()
 

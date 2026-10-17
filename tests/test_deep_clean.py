@@ -41,7 +41,8 @@ def test_record_clean_history(monkeypatch):
 
 def test_junk_notice_throttled_to_once_a_day(tmp_path, monkeypatch):
     monkeypatch.setattr(backend, "AUTO_CLEAN_SETTINGS_PATH", str(tmp_path / "s.json"))
-    big = {"review_bytes": 2 * backend.JUNK_NOTIFY_BYTES}
+    monkeypatch.setattr(backend, "APP_SETTINGS_PATH", str(tmp_path / "a.json"))
+    big = {"review_bytes": 2 * 1024 ** 3}
     assert backend.should_notify_junk({"review_bytes": 10}) is False
     assert backend.should_notify_junk(big) is True
     assert backend.should_notify_junk(big) is False

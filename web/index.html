@@ -27,6 +27,7 @@
 <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18h.01"/></symbol>
 <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></symbol>
 <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
 <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></symbol>
 </defs></svg>
   <div class="bg-orb orb-1"></div>
@@ -39,13 +40,14 @@
       <span class="brand-mark"><svg class="ico" aria-hidden="true"><use href="#i-sparkles"/></svg></span>
       <span class="brand-name">PC Cleaner</span>
     </div>
-    <div class="topbar-status"><span id="statusText">กำลังสแกน...</span> <button class="ver-chip" id="btnLang" title="ภาษา / Language">EN</button> <button class="ver-chip mono" id="btnCheckUpdate" title="ตรวจอัปเดต">v<span id="appVersion">-</span></button></div>
+    <div class="topbar-status"><span id="statusText">กำลังสแกน...</span> <button class="ver-chip" id="btnSettings" title="ตั้งค่า" aria-label="ตั้งค่า"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button> <button class="ver-chip" id="btnLang" title="ภาษา / Language">EN</button> <button class="ver-chip mono" id="btnCheckUpdate" title="ตรวจอัปเดต">v<span id="appVersion">-</span></button></div>
   </header>
 
   <div id="updateBanner" class="update-banner hidden">
     <div class="update-info">
       <div class="update-title">มีเวอร์ชันใหม่ <span id="updateVersion" class="mono"></span></div>
       <div class="update-sub" id="updateSub">พร้อมอัปเดตอัตโนมัติ — โปรแกรมจะรีสตาร์ทเอง</div>
+      <details class="update-notes hidden" id="updateNotesWrap"><summary>มีอะไรใหม่</summary><div id="updateNotes"></div></details>
       <div class="update-bar"><div id="updateBarFill" class="update-bar-fill"></div></div>
     </div>
     <button class="btn btn-ghost" id="btnUpdateLater">ภายหลัง</button>
@@ -85,6 +87,7 @@
       <div class="treemap-header">
         <div class="panel-title">แผนภูมิพื้นที่ (Treemap) — คลิกเพื่อเจาะลึก</div>
         <div id="breadcrumb" class="breadcrumb"></div>
+        <button class="btn btn-ghost btn-sm" id="btnDiskMap" title="ดูว่าโฟลเดอร์ไหนในไดรฟ์ C: ใหญ่ที่สุด">แผนที่ไดรฟ์ C:</button>
       </div>
       <div id="treemap" class="treemap"></div>
       <div class="legend">
@@ -186,6 +189,16 @@
       <div class="panel-sub">คลิก "ถอนการติดตั้ง" เพื่อเปิดตัวถอนการติดตั้งของโปรแกรมนั้นๆ โดยตรง (เหมือนใช้ Apps & Features ของ Windows)</div>
       <div id="appList" class="item-list"></div>
     </section>
+    <section class="glass glow-hover panel-list">
+      <div class="leftover-head">
+        <div>
+          <div class="panel-title">ไฟล์ตกค้างหลังถอนโปรแกรม</div>
+          <div class="panel-sub">ตรวจเฉพาะโปรแกรมที่ถอนจากหน้านี้ — ย้ายเข้า Safety Vault (กู้คืนได้) ไม่แตะ Registry</div>
+        </div>
+        <button class="btn btn-accent" id="btnLeftovers">ตรวจไฟล์ตกค้าง</button>
+      </div>
+      <div id="leftoverList" class="item-list"></div>
+    </section>
   </main>
 
   <!-- Startup Manager tab -->
@@ -270,7 +283,7 @@
         <div class="panel-title">Safety Vault</div>
         <button class="btn-close" id="btnCloseVault" aria-label="ปิด"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
-      <div class="modal-sub">ไฟล์เหล่านี้จะถูกลบถาวรอัตโนมัติหลัง 14 วัน — กู้คืนได้ตลอดก่อนหน้านั้น</div>
+      <div class="modal-sub">ไฟล์ใน Vault จะถูกลบถาวรอัตโนมัติเมื่อครบกำหนด — กู้คืนได้ตลอดก่อนหน้านั้น (ตั้งจำนวนวันได้ในหน้าตั้งค่า)</div>
       <div id="vaultList" class="vault-list"></div>
     </div>
   </div>
@@ -304,6 +317,24 @@
     </div>
   </div>
 
+  <!-- Settings modal -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="glass modal">
+      <div class="modal-header">
+        <div class="panel-title">ตั้งค่า</div>
+        <button class="btn-close" id="btnCloseSettings" aria-label="ปิด"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
+      </div>
+      <label class="setting-row"><span>กดปิดหน้าต่างแล้วย่อลงถาด (tray) แทนการออก</span><input type="checkbox" id="setCloseToTray"></label>
+      <label class="setting-row"><span>เก็บไฟล์ใน Safety Vault ไว้ (วัน)</span><input type="number" id="setRetention" min="1" max="90" class="setting-num"></label>
+      <label class="setting-row"><span>แจ้งเตือนเมื่อมีขยะที่ต้องตรวจเองเกิน (GB, 0 = ปิด)</span><input type="number" id="setJunkGb" min="0" max="100" step="0.5" class="setting-num"></label>
+      <div class="modal-sub">ความถี่ของ Auto Clean ตั้งได้ที่การ์ด "ล้างอัตโนมัติ" ในหน้าล้างไฟล์ขยะ</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnSettingsCancel">ยกเลิก</button>
+        <button class="btn btn-accent" id="btnSettingsSave">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Confirm modal -->
   <div id="confirmModal" class="modal-backdrop hidden">
     <div class="glass modal modal-confirm">
@@ -333,44 +364,45 @@
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">Windows.old / ไฟล์อัปเดตเก่า</div>
-          <div class="app-publisher">ใหญ่ระดับหลายสิบ GB และ Windows ล็อกไว้ — เปิด Storage Sense ของ Windows เพื่อลบอย่างปลอดภัย</div>
+          <div class="app-publisher">ใหญ่ระดับหลายสิบ GB — ลบผ่าน Disk Cleanup ของ Windows (ย้อนกลับไป Windows เวอร์ชันก่อนไม่ได้อีก)</div>
         </div>
-        <button class="btn btn-accent" id="btnStorageCleanup">เปิด Storage Sense</button>
+        <button class="btn btn-ghost" id="btnStorageCleanup">Storage Sense</button>
+        <button class="btn btn-danger" id="btnWindowsOld">ลบ Windows.old</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">บล็อก Telemetry (ความเป็นส่วนตัว)</div>
           <div class="app-publisher">ปิดการส่งข้อมูลการใช้งานกลับไปยัง Microsoft</div>
         </div>
-        <button class="btn btn-warning" onclick="window.pywebview.api.disable_telemetry().then(res => alert(res.every(r => r.success) ? 'ปิด Telemetry สำเร็จ' : 'บางรายการล้มเหลว (ต้องรันแบบ Administrator)'))">ปิด Telemetry</button>
+        <button class="btn btn-warning" id="btnTelemetry">ปิด Telemetry</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">ปรับปรุง Registry</div>
           <div class="app-publisher">เคลียร์แคชและค่าที่ตกค้างในระบบอย่างปลอดภัย</div>
         </div>
-        <button class="btn btn-accent" onclick="window.pywebview.api.clean_registry().then(res => alert(res.message))">ปรับปรุงตอนนี้</button>
+        <button class="btn btn-accent" id="btnRegistry">ปรับปรุงตอนนี้</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">ค้นหาไฟล์ซ้ำ (Duplicate Finder)</div>
           <div class="app-publisher">ค้นหาไฟล์ที่ซ้ำกันเพื่อประหยัดพื้นที่</div>
         </div>
-        <button class="btn btn-accent" onclick="window.pywebview.api.find_duplicate_files('C:/').then(res => alert('พบไฟล์ซ้ำ: ' + res.total_groups + ' กลุ่ม'))">เริ่มค้นหา</button>
+        <button class="btn btn-accent" id="btnDuplicates">เริ่มค้นหา</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">ล้างเครือข่าย (Network Flush)</div>
           <div class="app-publisher">รีเซ็ต DNS และ Winsock เพื่อแก้ปัญหาเน็ตหลุด</div>
         </div>
-        <button class="btn btn-accent" onclick="window.pywebview.api.network_flush().then(res => alert('สำเร็จ ' + res.filter(r => r.success).length + '/' + res.length + ' รายการ (Winsock ต้องรีสตาร์ทเครื่อง)'))">ล้างแคชเน็ต</button>
+        <button class="btn btn-accent" id="btnNetFlush">ล้างแคชเน็ต</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
           <div class="app-name">อัปเดตโปรแกรม (Winget)</div>
           <div class="app-publisher">เช็คและอัปเดตโปรแกรมในเครื่องทั้งหมดรวดเดียว</div>
         </div>
-        <button class="btn btn-accent" onclick="window.pywebview.api.update_software_winget().then(res => alert('อัปเดตซอฟต์แวร์เสร็จสิ้น!'))">อัปเดตทั้งหมด</button>
+        <button class="btn btn-accent" id="btnWinget">อัปเดตทั้งหมด</button>
       </div>
     </div>
   </main>
