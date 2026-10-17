@@ -15,7 +15,18 @@ import backend
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 
 
+def _enable_hang_dump():
+    """PCCLEANER_DEBUG=1: dump every thread's stack to the log dir every 10s."""
+    import faulthandler
+    log_dir = os.path.join(os.environ.get("LOCALAPPDATA", "."), "PCCleaner", "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    f = open(os.path.join(log_dir, "hang_dump.log"), "a")
+    faulthandler.dump_traceback_later(10, repeat=True, file=f)
+
+
 def main():
+    if os.environ.get("PCCLEANER_DEBUG"):
+        _enable_hang_dump()
     if "--auto-clean" in sys.argv:
         # Headless entry point invoked by the "PCCleaner_AutoClean" Scheduled
         # Task -- no window, just scan/clean the safe targets and exit.
@@ -35,7 +46,7 @@ def main():
         min_size=(760, 600),
         background_color="#0e0e16",
     )
-    api.window = window
+    api._window = window
 
     webview.start()
 

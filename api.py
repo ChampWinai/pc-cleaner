@@ -29,7 +29,7 @@ _active_operations = {}
 
 class Api:
     def __init__(self):
-        self.window = None  # set by app_web.py after the window is created
+        self._window = None  # set by app_web.py after the window is created
         self._update_info = None
         self._update_path = None
         self._update_state = {"state": "idle", "percent": 0, "message": ""}
@@ -355,9 +355,9 @@ class Api:
     # ========================================================================
 
     def pick_folder(self):
-        if not self.window:
+        if not self._window:
             return None
-        result = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
         return result[0] if result else None
 
     def scan_sensitive_data(self, folder):
@@ -515,8 +515,8 @@ class Api:
         if self._update_state["state"] != "ready":
             return {"success": False}
         UpdateChecker.run_installer(self._update_path)
-        if self.window:
-            self.window.destroy()
+        if self._window:
+            self._window.destroy()
         return {"success": True}
 
     # ========================================================================

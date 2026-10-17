@@ -65,3 +65,14 @@ def test_checksum_mismatch_deletes_file(tmp_path):
     with pytest.raises(ValueError):
         UpdateChecker.download_installer(info(sha256="0" * 64))
     assert not list(tmp_path.glob("PCCleaner-Setup-*.exe"))
+
+
+def test_api_exposes_no_public_data_attributes():
+    """pywebview recursively walks public non-callable attributes of js_api;
+    a public `window` attr made it traverse the whole Window object graph
+    and eat GBs of RAM at startup. Keep state in _private attributes."""
+    import api
+    a = api.Api()
+    a._window = object()
+    public = [n for n in dir(a) if not n.startswith("_") and not callable(getattr(a, n))]
+    assert public == []
