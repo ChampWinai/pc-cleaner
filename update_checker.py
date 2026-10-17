@@ -11,7 +11,7 @@ import os
 
 log = logging.getLogger(__name__)
 
-CURRENT_VERSION = "1.1.5"  # Sync this with installer.iss line 6
+CURRENT_VERSION = "1.1.6"  # Sync this with installer.iss line 6
 GITHUB_REPO = "ChampWinai/pc-cleaner"
 INSTALLER_ASSET = "PCCleaner-Setup.exe"
 DOWNLOAD_PREFIX = f"https://github.com/{GITHUB_REPO}/releases/download/"

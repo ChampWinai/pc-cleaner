@@ -1,5 +1,9 @@
 ﻿"use strict";
 
+// Lazy handle on the pywebview bridge: `api.method()` resolves at call time, so
+// code that runs before the bridge is ready (or in a plain browser) is safe.
+const api = new Proxy({}, { get: (_, k) => window.pywebview && window.pywebview.api && window.pywebview.api[k] });
+
 const state = {
   items: [],       // {label, path, size, risk, note, checked} — top-level scan targets
   ramTimer: null,
@@ -301,8 +305,8 @@ async function scan() {
   renderList();
   showTreemapRoot();
   updateTotals();
-  $("statusText").textContent = found.length ? `พบ ${found.length} รายการ` : "สแกนเสร็จ";
-  $("itemCountText").textContent = found.length ? `พบ ${found.length} รายการ` : "เครื่องสะอาดอยู่แล้ว";
+  $("statusText").textContent = found.length ? `พบ ${found.length} รายการ · รวม ${humanReadable(found.reduce((s, it) => s + it.size, 0))}` : "สแกนเสร็จ";
+  $("itemCountText").textContent = found.length ? `พบ ${found.length} รายการ · รวม ${humanReadable(found.reduce((s, it) => s + it.size, 0))} (เลือกเพื่อล้าง)` : "เครื่องสะอาดอยู่แล้ว";
   $("btnCleanAll").disabled = found.length === 0;
 }
 
