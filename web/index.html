@@ -23,6 +23,10 @@
 <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
 <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18h.01"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
 <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></symbol>
 </defs></svg>
   <div class="bg-orb orb-1"></div>
@@ -35,7 +39,7 @@
       <span class="brand-mark"><svg class="ico" aria-hidden="true"><use href="#i-sparkles"/></svg></span>
       <span class="brand-name">PC Cleaner</span>
     </div>
-    <div class="topbar-status"><span id="statusText">กำลังสแกน...</span> <button class="ver-chip mono" id="btnCheckUpdate" title="ตรวจอัปเดต">v<span id="appVersion">-</span></button></div>
+    <div class="topbar-status"><span id="statusText">กำลังสแกน...</span> <button class="ver-chip" id="btnLang" title="ภาษา / Language">EN</button> <button class="ver-chip mono" id="btnCheckUpdate" title="ตรวจอัปเดต">v<span id="appVersion">-</span></button></div>
   </header>
 
   <div id="updateBanner" class="update-banner hidden">
@@ -65,6 +69,7 @@
         <div class="summary-label">พื้นที่ที่จะปลดล็อกได้</div>
         <div class="summary-value mono"><span id="totalValue">0</span><span class="summary-unit" id="totalUnit">B</span></div>
         <div class="summary-sub" id="itemCountText">พบ 0 รายการ</div>
+        <div class="meter hidden" id="cleanMeter"><div class="meter-fill" id="cleanMeterFill" style="width:0%"></div></div>
       </div>
       <div class="summary-right">
         <svg viewBox="0 0 120 120" class="ring">
@@ -128,6 +133,15 @@
           <div class="card-value muted" id="dockerText">กำลังตรวจสอบ...</div>
         </div>
         <button class="btn btn-accent" id="btnDocker" disabled>ล้าง Cache</button>
+      </div>
+
+      <div class="glass glow-hover card">
+        <div class="card-icon"><svg class="ico" aria-hidden="true"><use href="#i-archive"/></svg></div>
+        <div class="card-body">
+          <div class="card-title">ประวัติการล้าง</div>
+          <div class="card-value muted" id="historyText">ยังไม่เคยล้าง</div>
+        </div>
+        <button class="btn btn-ghost" id="btnHistory">ดู</button>
       </div>
 
       <div class="glass glow-hover card" style="--glow-rgb: var(--purple-rgb);">
@@ -241,7 +255,7 @@
     <div class="footer-left">
       <button class="btn btn-ghost" id="btnSelectAll">เลือกทั้งหมด</button>
       <button class="btn btn-ghost" id="btnSelectNone">ยกเลิก</button>
-      <button class="btn btn-ghost" id="btnRescan">⟳ สแกนใหม่</button>
+      <button class="btn btn-ghost" id="btnRescan"><svg class="ico" aria-hidden="true"><use href="#i-scan"/></svg> สแกนใหม่</button>
     </div>
     <div class="footer-right">
       <button class="btn btn-danger" id="btnCleanSelected" disabled><svg class="ico" aria-hidden="true"><use href="#i-trash"/></svg> ลบรายการที่เลือก</button>
@@ -261,6 +275,35 @@
     </div>
   </div>
 
+  <!-- History modal -->
+  <div id="historyModal" class="modal-backdrop hidden">
+    <div class="glass modal">
+      <div class="modal-header">
+        <div class="panel-title">ประวัติการล้าง</div>
+        <button class="btn-close" id="btnCloseHistory" aria-label="ปิด"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="modal-sub">ขนาดเป็นค่าประมาณจากตอนสแกน</div>
+      <div id="historyList" class="vault-list"></div>
+    </div>
+  </div>
+
+  <!-- Debloat modal -->
+  <div id="debloatModal" class="modal-backdrop hidden">
+    <div class="glass modal">
+      <div class="modal-header">
+        <div class="panel-title">Windows Debloat</div>
+        <button class="btn-close" id="btnCloseDebloat" aria-label="ปิด"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="modal-sub">เลือกแอปที่จะถอน — แอปที่คนใช้บ่อยไม่ได้ติ๊กไว้ การถอนแอป Store ย้อนกลับไม่ได้เสมอไป</div>
+      <div id="debloatList" class="vault-list"></div>
+      <label class="debloat-rp"><input type="checkbox" id="debloatRestorePoint" checked> สร้าง restore point ก่อน (แนะนำ)</label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnDebloatCancel">ยกเลิก</button>
+        <button class="btn btn-danger" id="btnDebloatRun">ถอนที่เลือก</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Confirm modal -->
   <div id="confirmModal" class="modal-backdrop hidden">
     <div class="glass modal modal-confirm">
@@ -273,7 +316,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
 
   <main class="layout tab-panel hidden" id="tab-advanced">
     <div class="glass panel-header">
@@ -286,7 +328,14 @@
           <div class="app-name">Windows Debloat</div>
           <div class="app-publisher">ลบแอปขยะที่มาพร้อมกับ Windows (เช่น Xbox, Candy Crush)</div>
         </div>
-        <button class="btn btn-danger" onclick="if (confirm('ถอนการติดตั้งแอป Windows ที่มากับเครื่อง (Xbox, Maps, Camera ฯลฯ) ย้อนกลับไม่ได้ ดำเนินการต่อ?')) window.pywebview.api.debloat_windows().then(res => alert('ถอนสำเร็จ ' + res.filter(r => r.success).length + '/' + res.length + ' รายการ'))">เริ่มทำความสะอาด</button>
+        <button class="btn btn-danger" id="btnDebloat">เลือกแอปที่จะถอน</button>
+      </div>
+      <div class="glass list-item">
+        <div class="app-info">
+          <div class="app-name">Windows.old / ไฟล์อัปเดตเก่า</div>
+          <div class="app-publisher">ใหญ่ระดับหลายสิบ GB และ Windows ล็อกไว้ — เปิด Storage Sense ของ Windows เพื่อลบอย่างปลอดภัย</div>
+        </div>
+        <button class="btn btn-accent" id="btnStorageCleanup">เปิด Storage Sense</button>
       </div>
       <div class="glass list-item">
         <div class="app-info">
@@ -326,5 +375,7 @@
     </div>
   </main>
 
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

@@ -203,10 +203,10 @@ async function loadHistoryStats() {
     const statsElement = $('history-stats');
     if (statsElement) {
       statsElement.innerHTML = `
-        <div>📊 Total Scans: <strong>${stats.total_scans || 0}</strong></div>
-        <div>🗑️ Total Cleaned: <strong>${humanSize(stats.total_cleaned_bytes || 0)}</strong></div>
-        <div>⚠️ Errors: <strong>${stats.total_errors || 0}</strong></div>
-        <div>♻️ Vault Restores: <strong>${stats.total_vault_restores || 0}</strong></div>
+        <div>Total Scans: <strong>${stats.total_scans || 0}</strong></div>
+        <div>Total Cleaned: <strong>${humanSize(stats.total_cleaned_bytes || 0)}</strong></div>
+        <div>Errors: <strong>${stats.total_errors || 0}</strong></div>
+        <div>Vault Restores: <strong>${stats.total_vault_restores || 0}</strong></div>
       `;
     }
   } catch (e) {
@@ -310,21 +310,25 @@ async function scan() {
   $("btnCleanAll").disabled = found.length === 0;
 }
 
+function svgIcon(name) {
+  return `<svg class="ico" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+}
+
 function iconFor(label) {
   const l = label.toLowerCase();
-  if (l.includes("temp")) return "🗑";
-  if (l.includes("prefetch")) return "⚡";
-  if (l.includes("cache")) return "🌐";
-  if (l.includes("report") || l.includes("dump") || l.includes("log")) return "⚠";
-  if (l.includes("thumbnail")) return "🖼";
-  return "📁";
+  if (l.includes("temp")) return svgIcon("trash");
+  if (l.includes("prefetch")) return svgIcon("zap");
+  if (l.includes("cache")) return svgIcon("globe");
+  if (l.includes("report") || l.includes("dump") || l.includes("log")) return svgIcon("alert");
+  if (l.includes("thumbnail")) return svgIcon("image");
+  return svgIcon("folder");
 }
 
 function renderList() {
   const container = $("itemList");
   container.innerHTML = "";
   if (state.items.length === 0) {
-    container.innerHTML = `<div class="empty-state">✅ เครื่องสะอาดอยู่แล้ว ไม่พบไฟล์ขยะ</div>`;
+    container.innerHTML = `<div class="empty-state">เครื่องสะอาดอยู่แล้ว ไม่พบไฟล์ขยะ</div>`;
     return;
   }
   state.items.forEach((it, idx) => {
@@ -522,7 +526,7 @@ async function performClean(selected) {
   const risky = selected.filter((it) => it.risk === "medium" || it.risk === "high");
   let body = `จะย้ายไฟล์ ${selected.length} รายการ รวม ${humanReadable(total)} เข้า Safety Vault (กู้คืนได้ 14 วัน)`;
   if (risky.length) {
-    body += "\n\n⚠ ควรตรวจสอบ:\n" + risky.map((it) => `• ${it.label}: ${it.note}`).join("\n");
+    body += "\n\nควรตรวจสอบ:\n" + risky.map((it) => `• ${it.label}: ${it.note}`).join("\n");
   }
   const ok = await confirmDialog("ยืนยันการลบ", body);
   if (!ok) return;
@@ -531,15 +535,66 @@ async function performClean(selected) {
   $("btnCleanAll").disabled = true;
   $("statusText").textContent = "กำลังลบ...";
 
-  const payload = selected.map((it) => ({ label: it.label, path: it.path }));
-  const result = await window.pywebview.api.clean(payload);
+  const payload = selected.map((it) => ({ label: it.label, path: it.path, size: it.size }));
+  const meter = $("cleanMeter");
+  meter.classList.remove("hidden");
+  const poll = setInterval(async () => {
+    const p = await api.clean_progress();
+    if (!p.total) return;
+    const pct = Math.round((p.done / p.total) * 100);
+    $("cleanMeterFill").style.width = pct + "%";
+    $("statusText").textContent = `กำลังลบ... ${pct}% (${p.done}/${p.total})`;
+  }, 300);
+  let result;
+  try {
+    result = await window.pywebview.api.clean(payload);
+  } finally {
+    clearInterval(poll);
+    meter.classList.add("hidden");
+    $("cleanMeterFill").style.width = "0%";
+  }
 
   toast(`ย้ายไปยัง Safety Vault แล้ว ปลดพื้นที่ได้ ${result.freed_human}`, "success");
   if (result.errors.length) {
     toast(`${result.errors.length} รายการทำไม่สำเร็จ (ไฟล์กำลังถูกใช้งานอยู่)`, "error");
   }
   refreshVaultCount();
+  refreshHistory();
   scan();
+}
+
+// ---------------------------------------------------------------------
+// Clean history
+// ---------------------------------------------------------------------
+async function refreshHistory() {
+  const h = await api.clean_history();
+  const last = h.recent[0];
+  $("historyText").textContent = last
+    ? `รวม ${h.stats.total_human} · ล่าสุด ${last.timestamp.slice(0, 16)}`
+    : "ยังไม่เคยล้าง";
+  return h;
+}
+
+async function openHistory() {
+  const h = await refreshHistory();
+  const list = $("historyList");
+  list.innerHTML = h.recent.length ? "" : `<div class="empty-state">ยังไม่มีประวัติ</div>`;
+  h.recent.forEach((r) => {
+    const row = document.createElement("div");
+    row.className = "vault-row";
+    row.innerHTML = `<div class="vault-row-info"><div class="vault-row-label"></div><div class="vault-row-meta mono"></div></div><div class="mono">${r.size_human}</div>`;
+    row.querySelector(".vault-row-label").textContent = r.scan_type === "auto" ? "Auto Clean" : "ล้างด้วยตัวเอง";
+    row.querySelector(".vault-row-meta").textContent = `${r.timestamp.slice(0, 16)} · ${r.items_found} รายการ`;
+    list.appendChild(row);
+  });
+  $("historyModal").classList.remove("hidden");
+}
+
+async function openStorageCleanup() {
+  const r = await api.open_storage_cleanup();
+  if (!r.success) toast("เปิดหน้า Storage ไม่สำเร็จ", "error");
+  else if (r.windows_old) toast("เลือก \"การติดตั้ง Windows ก่อนหน้า\" ในหน้าที่เปิดขึ้นมา", "info");
+  else toast("ไม่พบ Windows.old — เปิดหน้า Storage ให้ล้างไฟล์ชั่วคราวอื่นได้", "info");
 }
 
 // ---------------------------------------------------------------------
@@ -707,6 +762,39 @@ function switchTab(name) {
 }
 
 // ---------------------------------------------------------------------
+// Windows Debloat (pick which apps to remove)
+// ---------------------------------------------------------------------
+async function openDebloat() {
+  const list = $("debloatList");
+  list.innerHTML = `<div class="empty-state">กำลังตรวจแอปที่ติดตั้ง...</div>`;
+  $("debloatModal").classList.remove("hidden");
+  const apps = await api.list_bloatware();
+  list.innerHTML = apps.length ? "" : `<div class="empty-state">ไม่พบแอปขยะที่รู้จักบนเครื่องนี้</div>`;
+  apps.forEach((a) => {
+    const row = document.createElement("label");
+    row.className = "debloat-row";
+    row.innerHTML = `<input type="checkbox" value="${a.package}" ${a.checked ? "checked" : ""}><span></span>`;
+    row.querySelector("span").textContent = a.name;
+    list.appendChild(row);
+  });
+}
+
+async function runDebloat() {
+  const picked = [...document.querySelectorAll("#debloatList input:checked")].map((i) => i.value);
+  if (!picked.length) return toast("ยังไม่ได้เลือกแอป", "info");
+  const btn = $("btnDebloatRun");
+  btn.disabled = true;
+  btn.textContent = "กำลังถอน...";
+  const r = await api.debloat_windows(picked, $("debloatRestorePoint").checked);
+  btn.disabled = false;
+  btn.textContent = "ถอนที่เลือก";
+  $("debloatModal").classList.add("hidden");
+  const ok = r.results.filter((x) => x.success).length;
+  if (r.restore_message) toast(r.restore_message, r.restore_point ? "success" : "info");
+  toast(`ถอนสำเร็จ ${ok}/${r.results.length} รายการ`, ok === r.results.length ? "success" : "error");
+}
+
+// ---------------------------------------------------------------------
 // App Uninstaller
 // ---------------------------------------------------------------------
 async function loadApps() {
@@ -735,8 +823,7 @@ async function loadApps() {
         `จะเปิดตัวถอนการติดตั้งของ "${app.name}" — ทำตามขั้นตอนในหน้าต่างที่เปิดขึ้นมาให้จบ`
       );
       if (!ok) return;
-      const cmd = app.quiet_uninstall_string || app.uninstall_string;
-      const result = await window.pywebview.api.uninstall_app(cmd);
+      const result = await window.pywebview.api.uninstall_app(app.id);
       if (result.success) toast(`เปิดตัวถอนการติดตั้งของ ${app.name} แล้ว`, "info");
       else toast("เปิดตัวถอนการติดตั้งไม่สำเร็จ", "error");
     });
@@ -843,7 +930,7 @@ async function loadGameMode() {
     row.className = "item-card";
     row.innerHTML = `
       <div class="item-check ${gameModeState.checked.has(p.name) ? "checked" : ""}"></div>
-      <div class="item-icon">🧩</div>
+      <div class="item-icon">${svgIcon("cpu")}</div>
       <div class="item-text">
         <div class="item-label">${p.name}</div>
         <div class="item-note">${p.pids.length} โปรเซส</div>
@@ -860,9 +947,9 @@ async function loadGameMode() {
 }
 
 function renderGameModeStatus(active) {
-  $("gameModeStatus").textContent = active ? "🟢 กำลังทำงาน" : "ปิดอยู่";
+  $("gameModeStatus").textContent = active ? "กำลังทำงาน" : "ปิดอยู่";
   const btn = $("btnGameModeToggle");
-  btn.textContent = active ? "⏹ ปิด Game Mode" : "🎮 เปิด Game Mode";
+  btn.textContent = active ? "ปิด Game Mode" : "เปิด Game Mode";
   btn.className = active ? "btn btn-danger" : "btn btn-accent";
 }
 
@@ -904,7 +991,7 @@ async function pickFolderAndScan() {
   $("privacyFolderText").textContent = `สแกนแล้ว: ${folder} — พบ ${findings.length} จุดที่น่าสงสัย`;
   list.innerHTML = "";
   if (findings.length === 0) {
-    list.innerHTML = `<div class="empty-state">✅ ไม่พบข้อมูลอ่อนไหวที่ตรงรูปแบบที่ตรวจสอบได้</div>`;
+    list.innerHTML = `<div class="empty-state">ไม่พบข้อมูลอ่อนไหวที่ตรงรูปแบบที่ตรวจสอบได้</div>`;
     return;
   }
 
@@ -985,7 +1072,7 @@ async function checkDriverUpdates() {
   }
 
   if (result.updates.length === 0) {
-    $("driverUpdateText").textContent = "✅ ไม่มีอัปเดตไดรเวอร์ที่รอติดตั้งจาก Windows Update";
+    $("driverUpdateText").textContent = "ไม่มีอัปเดตไดรเวอร์ที่รอติดตั้งจาก Windows Update";
     $("driverUpdatesPanel").style.display = "none";
     return;
   }
@@ -1015,7 +1102,20 @@ async function openWindowsUpdate() {
 // ---------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------
+function savedLang() {
+  try { return localStorage.getItem("lang") || "th"; } catch { return "th"; }
+}
+
+function toggleLang() {
+  const next = i18n.lang === "en" ? "th" : "en";
+  try { localStorage.setItem("lang", next); } catch {}
+  i18n.apply(next);
+}
+
 function init() {
+  i18n.watch();
+  i18n.apply(savedLang());
+  $("btnLang").addEventListener("click", toggleLang);
   $("btnRescan").addEventListener("click", scan);
   $("btnSelectAll").addEventListener("click", () => {
     state.items.forEach((it) => (it.checked = true));
@@ -1039,6 +1139,13 @@ function init() {
   $("btnCheckDrivers").addEventListener("click", checkDriverUpdates);
   $("btnOpenWU").addEventListener("click", openWindowsUpdate);
   $("deepToggle").addEventListener("change", scan);
+  $("btnDebloat").addEventListener("click", openDebloat);
+  $("btnHistory").addEventListener("click", openHistory);
+  $("btnCloseHistory").addEventListener("click", () => $("historyModal").classList.add("hidden"));
+  $("btnStorageCleanup").addEventListener("click", openStorageCleanup);
+  $("btnDebloatRun").addEventListener("click", runDebloat);
+  $("btnDebloatCancel").addEventListener("click", () => $("debloatModal").classList.add("hidden"));
+  $("btnCloseDebloat").addEventListener("click", () => $("debloatModal").classList.add("hidden"));
   $("btnUpdateNow").addEventListener("click", startUpdate);
   $("btnUpdateLater").addEventListener("click", () => $("updateBanner").classList.add("hidden"));
   $("btnCheckUpdate").addEventListener("click", () => checkForUpdates(true));
@@ -1054,6 +1161,7 @@ function init() {
   refreshVaultCount();
   initDocker();
   refreshAutoCleanStatus();
+  refreshHistory();
   checkForUpdates();
   state.ramTimer = setInterval(refreshRam, 5000);
 }

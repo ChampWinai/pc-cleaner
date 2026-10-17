@@ -815,3 +815,30 @@ button, select, input[type="checkbox"], .ver-chip { cursor: pointer; }
 body { grid-template-columns: 196px minmax(0, 1fr); }
 .cards-row { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .card .btn { flex: none; white-space: nowrap; }
+
+/* Debloat picker */
+.debloat-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px;
+               background: var(--track); cursor: pointer; font-size: 13px; }
+.debloat-row:hover { background: var(--card-hover); }
+.debloat-row input, .debloat-rp input { accent-color: var(--accent); width: 16px; height: 16px; }
+.debloat-rp { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+#debloatList { max-height: 46vh; }
+.item-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+             background: var(--track); color: var(--text-dim); }
+.item-icon .ico { width: 16px; height: 16px; }
+
+/* Modals: near-opaque so text behind doesn't bleed through */
+.modal { background: rgba(22, 29, 46, 0.97); }
+.modal-backdrop { backdrop-filter: blur(4px); }
+
+/* Advanced Tools list (markup had no styles) */
+.panel-header { padding: 18px 22px; }
+.panel-desc { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+.list-view { display: flex; flex-direction: column; gap: 10px; }
+.list-item { display: flex; align-items: center; gap: 16px; padding: 14px 18px; }
+.list-item .app-info { flex: 1; min-width: 0; }
+.list-item .app-name { font-weight: 700; font-size: 13.5px; }
+.list-item .app-publisher { color: var(--text-dim); font-size: 12px; margin-top: 3px; }
+.list-item .btn { flex: none; min-width: 150px; }
+.btn-warning { background: linear-gradient(135deg, #F59E0B, #F97316); color: #2a1300; }

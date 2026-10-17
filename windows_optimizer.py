@@ -4,31 +4,80 @@ import logging
 
 log = logging.getLogger(__name__)
 
-def remove_bloatware():
-    # Remove common pre-installed Windows 10/11 bloatware
-    apps_to_remove = [
-        'Microsoft.BingNews', 'Microsoft.BingWeather', 'Microsoft.GamingApp', 
-        'Microsoft.GetHelp', 'Microsoft.Getstarted', 'Microsoft.MicrosoftOfficeHub', 
-        'Microsoft.MicrosoftSolitaireCollection', 'Microsoft.People', 
-        'Microsoft.SkypeApp', 'Microsoft.WindowsAlarms', 'Microsoft.WindowsCamera',
-        'Microsoft.windowscommunicationsapps', 'Microsoft.WindowsFeedbackHub', 
-        'Microsoft.WindowsMaps', 'Microsoft.WindowsSoundRecorder', 
-        'Microsoft.Xbox.TCUI', 'Microsoft.XboxApp', 'Microsoft.XboxGameOverlay', 
-        'Microsoft.XboxGamingOverlay', 'Microsoft.XboxIdentityProvider', 
-        'Microsoft.XboxSpeechToTextOverlay', 'Microsoft.ZuneMusic', 
-        'Microsoft.ZuneVideo', 'TikTok'
-    ]
-    
+# (package name, display name, pre-checked). Apps many people actually use
+# start unchecked so a careless click doesn't remove the Camera.
+BLOATWARE = [
+    ("Microsoft.BingNews", "Microsoft News", True),
+    ("Microsoft.BingWeather", "Weather", True),
+    ("Microsoft.GamingApp", "Xbox App", True),
+    ("Microsoft.GetHelp", "Get Help", True),
+    ("Microsoft.Getstarted", "Tips", True),
+    ("Microsoft.MicrosoftOfficeHub", "Office Hub", True),
+    ("Microsoft.MicrosoftSolitaireCollection", "Solitaire Collection", True),
+    ("Microsoft.People", "People", True),
+    ("Microsoft.SkypeApp", "Skype", True),
+    ("Microsoft.windowscommunicationsapps", "Mail & Calendar", False),
+    ("Microsoft.WindowsFeedbackHub", "Feedback Hub", True),
+    ("Microsoft.Xbox.TCUI", "Xbox TCUI", True),
+    ("Microsoft.XboxApp", "Xbox Console Companion", True),
+    ("Microsoft.XboxGameOverlay", "Xbox Game Overlay", False),
+    ("Microsoft.XboxGamingOverlay", "Xbox Game Bar", False),
+    ("Microsoft.XboxIdentityProvider", "Xbox Identity Provider", False),
+    ("Microsoft.XboxSpeechToTextOverlay", "Xbox Speech To Text", True),
+    ("Microsoft.ZuneMusic", "Media Player / Groove", False),
+    ("Microsoft.ZuneVideo", "Movies & TV", True),
+    ("Microsoft.WindowsAlarms", "Alarms & Clock", False),
+    ("Microsoft.WindowsCamera", "Camera", False),
+    ("Microsoft.WindowsMaps", "Maps", False),
+    ("Microsoft.WindowsSoundRecorder", "Sound Recorder", False),
+    ("TikTok", "TikTok", True),
+]
+_KNOWN = {pkg for pkg, _, _ in BLOATWARE}
+
+
+def _ps(command, timeout=60):
+    return subprocess.run(["powershell", "-NoProfile", "-Command", command],
+                          capture_output=True, text=True, timeout=timeout)
+
+
+def list_bloatware():
+    """Return only the BLOATWARE entries actually installed on this PC."""
+    try:
+        res = _ps("Get-AppxPackage | Select-Object -ExpandProperty Name")
+        installed = set(res.stdout.split())
+    except Exception as e:
+        log.warning("Failed to list Appx packages: %s", e)
+        return []
+    return [{"package": pkg, "name": name, "checked": checked}
+            for pkg, name, checked in BLOATWARE if pkg in installed]
+
+
+def create_restore_point():
+    """Best effort. Fails if System Protection is off; Windows also silently
+    skips it if another restore point was made in the last 24h."""
+    try:
+        res = _ps('Checkpoint-Computer -Description "PC Cleaner Debloat" '
+                  '-RestorePointType MODIFY_SETTINGS -WarningAction Stop', timeout=180)
+        if res.returncode == 0:
+            return True, "สร้าง restore point แล้ว"
+        return False, "สร้าง restore point ไม่ได้ (System Protection อาจปิดอยู่ หรือเพิ่งสร้างไปภายใน 24 ชม.)"
+    except Exception as e:
+        return False, f"สร้าง restore point ไม่ได้: {e}"
+
+
+def remove_bloatware(packages):
+    """Remove the selected packages. Names come from the UI, so anything not
+    in our own list is rejected before it gets near a PowerShell command."""
     results = []
-    for app in apps_to_remove:
-        cmd = f'Get-AppxPackage -Name {app} | Remove-AppxPackage'
+    for pkg in packages:
+        if pkg not in _KNOWN:
+            results.append({"app": pkg, "success": False, "error": "not allowed"})
+            continue
         try:
-            res = subprocess.run(["powershell", "-Command", cmd], capture_output=True, text=True, timeout=30)
-            success = res.returncode == 0
-            results.append({"app": app, "success": success})
+            res = _ps(f"Get-AppxPackage -Name '{pkg}' | Remove-AppxPackage", timeout=60)
+            results.append({"app": pkg, "success": res.returncode == 0})
         except Exception as e:
-            results.append({"app": app, "success": False, "error": str(e)})
-            
+            results.append({"app": pkg, "success": False, "error": str(e)})
     return results
 
 def disable_telemetry():

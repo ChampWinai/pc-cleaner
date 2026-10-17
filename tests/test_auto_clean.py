@@ -23,6 +23,7 @@ def sandbox(tmp_path, monkeypatch):
     monkeypatch.setattr(backend, "VAULT_INDEX_PATH", str(vault / "index.json"))
     monkeypatch.setattr(backend, "AUTO_CLEAN_SETTINGS_PATH", str(tmp_path / "settings.json"))
     monkeypatch.setattr(backend, "AUTO_CLEAN_LOG_PATH", str(tmp_path / "log.json"))
+    monkeypatch.setattr(backend, "record_clean_history", lambda *a: None)  # keep real history.db clean
     return tmp_path
 
 

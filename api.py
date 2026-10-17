@@ -238,7 +238,21 @@ class Api:
 
     def clean(self, selected):
         freed, errors, _batch_id = backend.clean_items(selected)
+        backend.record_clean_history("manual", selected, freed)
         return {"freed": freed, "freed_human": backend.human_size(freed), "errors": errors}
+
+    def open_storage_cleanup(self):
+        return {"success": backend.open_storage_cleanup(), "windows_old": backend.windows_old_present()}
+
+    def clean_progress(self):
+        return backend.clean_progress
+
+    def clean_history(self):
+        h = backend.clean_history()
+        for r in h["recent"]:
+            r["size_human"] = backend.human_size(r.get("total_size_bytes") or 0)
+        h["stats"]["total_human"] = backend.human_size(h["stats"].get("total_cleaned_bytes") or 0)
+        return h
 
     def ram_status(self):
         return backend.ram_status()
@@ -304,8 +318,8 @@ class Api:
             a["size_human"] = backend.human_size(a["size"])
         return apps
 
-    def uninstall_app(self, uninstall_string):
-        return {"success": backend.uninstall_app(uninstall_string)}
+    def uninstall_app(self, app_id):
+        return {"success": backend.uninstall_app(app_id)}
 
     # ========================================================================
     # STARTUP MANAGER
@@ -593,9 +607,15 @@ class Api:
         return {"success": backend.remove_context_menu()}
 
     # -- New Advanced Tools --------------------------------------------------
-    def debloat_windows(self):
+    def list_bloatware(self):
         import windows_optimizer
-        return windows_optimizer.remove_bloatware()
+        return windows_optimizer.list_bloatware()
+
+    def debloat_windows(self, packages, restore_point=True):
+        import windows_optimizer
+        rp_ok, rp_msg = windows_optimizer.create_restore_point() if restore_point else (False, "")
+        return {"restore_point": rp_ok, "restore_message": rp_msg,
+                "results": windows_optimizer.remove_bloatware(packages)}
 
     def disable_telemetry(self):
         import windows_optimizer

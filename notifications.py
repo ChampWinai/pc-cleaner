@@ -14,113 +14,90 @@ except ImportError:
     HAS_PYSTRAY = False
     log.warning("pystray not available; system tray disabled")
 
-try:
-    from win10toast import ToastNotifier
-    HAS_TOAST = True
-except ImportError:
-    HAS_TOAST = False
-    log.warning("win10toast not available; desktop notifications disabled")
+
+
+def _tray_image():
+    """Green rounded-square mark drawn at runtime, so no .ico file is needed."""
+    from PIL import ImageDraw
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((2, 2, 62, 62), radius=16, fill=(34, 197, 94, 255))
+    d.polygon([(32, 12), (37, 27), (52, 32), (37, 37), (32, 52), (27, 37), (12, 32), (27, 27)],
+              fill=(4, 33, 15, 255))
+    return img
 
 
 class TrayManager:
-    """Manage system tray icon and interactions."""
+    """Tray icon: open window, quick (safe-only) clean, quit."""
 
-    def __init__(self, app_name: str = 'PC Cleaner', icon_path: Optional[str] = None):
+    def __init__(self, app_name: str = 'PC Cleaner'):
         self.app_name = app_name
-        self.icon_path = icon_path or self._get_default_icon()
         self.icon = None
-        self.on_click_restore = None
-        self.on_click_clean = None
-        self.on_click_quit = None
-
-    def _get_default_icon(self) -> str:
-        """Get path to default app icon."""
-        app_dir = Path(__file__).parent
-        icon_path = app_dir / 'icon.ico'
-        if icon_path.exists():
-            return str(icon_path)
-        # Fallback: create a simple 1x1 blue pixel
-        return None
-
-    def create_icon(self) -> bool:
-        """Create and show system tray icon."""
-        if not HAS_PYSTRAY:
-            log.warning("pystray not installed; cannot create tray icon")
-            return False
-
-        try:
-            if self.icon_path and Path(self.icon_path).exists():
-                image = Image.open(self.icon_path)
-            else:
-                # Create a simple blue square if no icon available
-                image = Image.new('RGB', (64, 64), color=(10, 132, 255))
-
-            menu = Menu(
-                MenuItem(f'🔍 {self.app_name}', lambda icon, item: self._handle_restore()),
-                MenuItem('🧹 Scan Now', lambda icon, item: self._handle_scan()),
-                MenuItem('⚙️ Settings', lambda icon, item: self._handle_settings()),
-                Menu.SEPARATOR,
-                MenuItem('❌ Exit', lambda icon, item: self._handle_quit()),
-            )
-
-            self.icon = Icon(self.app_name, image, menu=menu)
-            log.info("System tray icon created successfully")
-            return True
-        except Exception as e:
-            log.error(f"Failed to create tray icon: {e}")
-            return False
+        self.on_click_restore: Optional[Callable] = None
+        self.on_click_clean: Optional[Callable] = None
+        self.on_click_quit: Optional[Callable] = None
 
     def show(self) -> bool:
-        """Show tray icon."""
-        if not self.icon:
-            if not self.create_icon():
-                return False
+        if not HAS_PYSTRAY:
+            return False
+        if self.icon:
+            return True
         try:
-            self.icon.run_in_background()
-            log.info("Tray icon displayed")
+            menu = Menu(
+                MenuItem('เปิด PC Cleaner', lambda i, it: self._call(self.on_click_restore), default=True),
+                MenuItem('ล้างด่วน (เฉพาะที่ปลอดภัย)', lambda i, it: self._call(self.on_click_clean)),
+                Menu.SEPARATOR,
+                MenuItem('ออก', lambda i, it: self._call(self.on_click_quit)),
+            )
+            self.icon = Icon(self.app_name, _tray_image(), self.app_name, menu)
+            self.icon.run_detached()
             return True
         except Exception as e:
             log.error(f"Failed to show tray icon: {e}")
+            self.icon = None
             return False
 
     def hide(self) -> bool:
-        """Hide tray icon."""
-        if self.icon:
-            try:
-                self.icon.stop()
-                log.info("Tray icon hidden")
-                return True
-            except Exception as e:
-                log.error(f"Failed to hide tray icon: {e}")
-        return False
-
-    def _handle_restore(self):
-        """Handle restore window click."""
-        if self.on_click_restore:
-            self.on_click_restore()
-
-    def _handle_scan(self):
-        """Handle scan click."""
-        if self.on_click_clean:
-            self.on_click_clean()
-
-    def _handle_settings(self):
-        """Handle settings click."""
-        log.info("Settings requested from tray")
-
-    def _handle_quit(self):
-        """Handle quit click."""
-        if self.on_click_quit:
-            self.on_click_quit()
-
-    def notify(self, title: str, message: str):
-        """Show a system tray notification."""
+        if not self.icon:
+            return False
         try:
-            if HAS_PYSTRAY and self.icon:
+            self.icon.stop()
+        except Exception as e:
+            log.debug(f"Tray stop failed: {e}")
+        self.icon = None
+        return True
+
+    @staticmethod
+    def _call(fn):
+        if fn:
+            fn()
+
+    def notify(self, title: str, message: str) -> bool:
+        try:
+            if self.icon:
                 self.icon.notify(message, title)
                 return True
         except Exception as e:
             log.debug(f"Tray notification failed: {e}")
+        return False
+
+
+def notify_once(title: str, message: str, seconds: float = 8) -> bool:
+    """Toast from a process with no tray icon (the headless Auto Clean run):
+    show a temporary icon long enough for Windows to display the toast."""
+    if not HAS_PYSTRAY:
+        return False
+    import time
+    try:
+        icon = Icon("PC Cleaner", _tray_image(), "PC Cleaner")
+        icon.run_detached()
+        time.sleep(0.5)
+        icon.notify(message, title)
+        time.sleep(seconds)
+        icon.stop()
+        return True
+    except Exception as e:
+        log.debug(f"notify_once failed: {e}")
         return False
 
 
@@ -129,31 +106,20 @@ class NotificationManager:
 
     def __init__(self, app_name: str = 'PC Cleaner'):
         self.app_name = app_name
-        self.notifier = ToastNotifier() if HAS_TOAST else None
 
     def notify(self, title: str, message: str, duration: int = 5, icon: Optional[str] = None) -> bool:
-        """Send desktop notification."""
-        if not HAS_TOAST or not self.notifier:
-            log.warning("Desktop notifications not available")
-            return False
-
-        try:
-            self.notifier.show_toast(
-                title=title,
-                msg=message,
-                duration=duration,
-                threaded=True,
-            )
-            log.debug(f"Notification shown: {title} - {message}")
+        """Toast via the tray icon if it's up, else a temporary one (pystray
+        only -- win10toast was dropped: unmaintained and broken on new setuptools)."""
+        if tray_manager.notify(title, message):
             return True
-        except Exception as e:
-            log.error(f"Failed to show notification: {e}")
-            return False
+        import threading
+        threading.Thread(target=notify_once, args=(title, message, duration), daemon=True).start()
+        return HAS_PYSTRAY
 
     def notify_scan_complete(self, items_found: int, total_size: str) -> bool:
         """Notify scan completion."""
         return self.notify(
-            title='🔍 Scan Complete',
+            title='Scan Complete',
             message=f'Found {items_found} items ({total_size})',
             duration=5
         )
@@ -164,7 +130,7 @@ class NotificationManager:
         if errors > 0:
             msg += f' ({errors} errors)'
         return self.notify(
-            title='✨ Cleaning Complete',
+            title='Cleaning Complete',
             message=msg,
             duration=5
         )
@@ -172,7 +138,7 @@ class NotificationManager:
     def notify_update_available(self, version: str) -> bool:
         """Notify about available update."""
         return self.notify(
-            title='🎉 Update Available',
+            title='Update Available',
             message=f'PC Cleaner {version} is now available',
             duration=10
         )
@@ -180,7 +146,7 @@ class NotificationManager:
     def notify_error(self, operation: str, error: str) -> bool:
         """Notify about an error."""
         return self.notify(
-            title='⚠️ Error',
+            title='Error',
             message=f'{operation}: {error}',
             duration=7
         )
@@ -188,7 +154,7 @@ class NotificationManager:
     def notify_vault_full(self, usage_percent: int) -> bool:
         """Notify about vault usage."""
         return self.notify(
-            title='📦 Vault Status',
+            title='Vault Status',
             message=f'Vault is {usage_percent}% full',
             duration=5
         )
@@ -198,4 +164,4 @@ class NotificationManager:
 tray_manager = TrayManager()
 notification_manager = NotificationManager()
 
-__all__ = ['TrayManager', 'NotificationManager', 'tray_manager', 'notification_manager']
+__all__ = ['TrayManager', 'NotificationManager', 'tray_manager', 'notification_manager', 'notify_once']
